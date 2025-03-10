@@ -1,0 +1,99 @@
+.live-datetime-container {
+      position: fixed;
+      top: 75px;
+      right: 16px;
+      z-index: 1100;
+      display: flex;
+      align-items: center;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      transition: all 0.3s ease-in-out;
+      width: 48px;
+      height: 48px;
+      overflow: hidden;
+      cursor: pointer;
+}
+
+.live-datetime-container:hover {
+      width: 250px;
+      background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15);
+}
+
+.time-icon {
+      font-size: 28px !important;
+      color: #1976d2;
+      margin: 0 10px;
+      transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+.live-datetime-container:hover .time-icon {
+      transform: scale(1.1);
+      opacity: 0.8;
+}
+
+.datetime-content {
+      padding-right: 12px;
+      white-space: nowrap;
+}
+
+.date-text {
+      color: #555;
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      transition: opacity 0.3s ease;
+}
+
+.time-text {
+      color: #1976d2;
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      background: linear-gradient(to right, #1976d2, #42a5f5);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      transition: opacity 0.3s ease;
+}
+
+@media (prefers-color-scheme: dark) {
+      .live-datetime-container {
+            background: linear-gradient(135deg, #1e1e1e, #2c2c2c);
+      }
+
+      .live-datetime-container:hover {
+            background: linear-gradient(135deg, #2c2c2c, #424242);
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
+      }
+
+      .time-icon {
+            color: #90caf9;
+      }
+
+      .date-text {
+            color: #b0bec5;
+      }
+
+      .time-text {
+            background: linear-gradient(to right, #90caf9, #42a5f5);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+      }
+}
+
+@keyframes slideIn {
+      from {
+            opacity: 0;
+            transform: translateX(20px);
+      }
+
+      to {
+            opacity: 1;
+            transform: translateX(0);
+      }
+}
+
+.live-datetime-container {
+      animation: slideIn 0.5s ease-out forwards;
+}

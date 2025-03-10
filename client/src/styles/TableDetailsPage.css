@@ -1,0 +1,282 @@
+.page-container {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      margin: 0;
+      padding: 0;
+      background: var(--background-default, #f5f7fa);
+}
+
+:where(.dark) .page-container {
+      background: var(--background-default, #121212);
+}
+
+.appbar {
+      background: linear-gradient(90deg, #0288d1 0%, #4fc3f7 100%) !important;
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3) !important;
+      border-bottom: 2px solid #81d4fa;
+}
+
+:where(.dark) .appbar {
+      background: linear-gradient(90deg, #0288d1 0%, #1976d2 100%) !important;
+}
+
+.appbar-title {
+      flex-grow: 1;
+      font-weight: 700;
+      color: white;
+      letter-spacing: 1px;
+}
+
+.appbar-time {
+      font-size: 0.95rem;
+      color: white;
+      background: rgba(0, 0, 0, 0.25);
+      padding: 6px 14px;
+      border-radius: 20px;
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.main-content {
+      flex: 1;
+      display: flex;
+      height: calc(100vh - 64px);
+      margin: 0;
+}
+
+.left-panel,
+.right-panel {
+      height: 100%;
+      padding: 0;
+}
+
+.config-panel,
+.data-panel {
+      padding: 20px;
+      border-radius: 0;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      background: var(--paper-bg, white);
+      height: 100%;
+      overflow-y: auto;
+      transition: box-shadow 0.3s ease;
+}
+
+:where(.dark) .config-panel,
+:where(.dark) .data-panel {
+      background: var(--paper-bg, #1e1e1e);
+}
+
+.config-panel:hover,
+.data-panel:hover {
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
+}
+
+.panel-title {
+      color: var(--primary-color, #0277bd);
+      font-weight: 600;
+      margin-bottom: 16px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+}
+
+:where(.dark) .panel-title {
+      color: var(--primary-color, #4fc3f7);
+}
+
+.filter-title {
+      color: var(--text-primary, #37474f);
+      font-weight: 500;
+      margin-top: 16px;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      font-size: 1rem;
+}
+
+:where(.dark) .filter-title {
+      color: var(--text-primary, #e0e0e0);
+}
+
+.panel-divider {
+      margin-bottom: 16px;
+      background: var(--divider-color, #cfd8dc);
+}
+
+:where(.dark) .panel-divider {
+      background: var(--divider-color, #424242);
+}
+
+.input-field {
+      margin-bottom: 16px !important;
+      background: var(--input-bg, #fafafa);
+      border-radius: 8px;
+}
+
+:where(.dark) .input-field {
+      background: var(--input-bg, #2c2c2c);
+}
+
+.input-field .MuiOutlinedInput-root {
+      border-radius: 8px;
+}
+
+.input-field .MuiInputLabel-root {
+      color: var(--label-color, #546e7a);
+      font-weight: 500;
+}
+
+:where(.dark) .input-field .MuiInputLabel-root {
+      color: var(--label-color, #b0bec5);
+}
+
+.mesrand-label {
+      font-size: 0.9rem;
+      color: var(--text-secondary, #455a64);
+      margin-bottom: 8px;
+      font-weight: 500;
+}
+
+:where(.dark) .mesrand-label {
+      color: var(--text-secondary, #b0bec5);
+}
+
+.chip-container {
+      margin-bottom: 16px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+}
+
+.mesrand-chip {
+      background: var(--chip-bg, #e1f5fe) !important;
+      color: var(--chip-color, #0288d1) !important;
+      font-weight: 500;
+      border-radius: 16px;
+}
+
+:where(.dark) .mesrand-chip {
+      background: var(--chip-bg, #0288d1) !important;
+      color: var(--chip-color, white) !important;
+}
+
+.mesrand-chip .MuiChip-deleteIcon {
+      color: red !important;
+}
+
+.save-button {
+      background: var(--save-btn-bg, #4caf50) !important;
+      width: 100%;
+      padding: 10px !important;
+      text-transform: none !important;
+      margin-bottom: 20px;
+      border-radius: 8px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+}
+
+:where(.dark) .save-button {
+      background: var(--save-btn-bg, #388e3c) !important;
+}
+
+.save-button:hover {
+      background: var(--save-btn-hover, #43a047) !important;
+}
+
+:where(.dark) .save-button:hover {
+      background: var(--save-btn-hover, #2e7d32) !important;
+}
+
+.export-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+}
+
+.export-button {
+      color: var(--export-btn-color, #0288d1) !important;
+      border-color: var(--export-btn-border, #0288d1) !important;
+      text-transform: none !important;
+      padding: 8px !important;
+      border-radius: 8px;
+      font-weight: 500;
+      transition: all 0.3s ease;
+}
+
+:where(.dark) .export-button {
+      color: var(--export-btn-color, #4fc3f7) !important;
+      border-color: var(--export-btn-border, #4fc3f7) !important;
+}
+
+.export-button:hover {
+      background: var(--export-btn-hover-bg, #0288d1) !important;
+      color: white !important;
+      transform: translateY(-1px);
+}
+
+:where(.dark) .export-button:hover {
+      background: var(--export-btn-hover-bg, #1976d2) !important;
+}
+
+.data-grid-container {
+      height: calc(100% - 64px);
+      width: 100%;
+}
+
+.custom-datagrid {
+      border: none !important;
+      background: var(--paper-bg, white);
+}
+
+:where(.dark) .custom-datagrid {
+      background: var(--paper-bg, #1e1e1e);
+}
+
+.custom-datagrid .MuiDataGrid-columnHeaders {
+      background: var(--header-bg, #eceff1) !important;
+      color: var(--header-color, #37474f) !important;
+      font-weight: 600 !important;
+      border-bottom: 2px solid var(--divider-color, #cfd8dc);
+}
+
+:where(.dark) .custom-datagrid .MuiDataGrid-columnHeaders {
+      background: var(--header-bg, #2c2c2c) !important;
+      color: var(--header-color, #e0e0e0) !important;
+      border-bottom: 2px solid var(--divider-color, #424242);
+}
+
+.custom-datagrid .MuiDataGrid-row {
+      transition: background 0.2s ease;
+}
+
+.custom-datagrid .MuiDataGrid-row:hover {
+      background: var(--row-hover, #f5f7fa) !important;
+}
+
+:where(.dark) .custom-datagrid .MuiDataGrid-row:hover {
+      background: var(--row-hover, #2c2c2c) !important;
+}
+
+.custom-datagrid .MuiDataGrid-cell {
+      border-bottom: 1px solid var(--cell-border, #eceff1);
+      color: var(--text-primary, #37474f);
+}
+
+:where(.dark) .custom-datagrid .MuiDataGrid-cell {
+      border-bottom: 1px solid var(--cell-border, #424242);
+      color: var(--text-primary, #e0e0e0);
+}
+
+.loading-container,
+.error-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      flex-direction: column;
+      gap: 20px;
+      background: var(--background-default, #f5f7fa);
+}
+
+:where(.dark) .loading-container,
+:where(.dark) .error-container {
+      background: var(--background-default, #121212);
+}

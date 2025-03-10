@@ -1,0 +1,29 @@
+version: "3.8"
+services:
+  client:
+    image: iamyogeshmore/jiptl_dashboard_client:v2
+    container_name: jiptl_dashboard_client
+    ports:
+      - "5005:5005"
+    environment:
+      - PORT=5005
+      - REACT_APP_API_LOCAL_URL=http://localhost:6005/
+    volumes:
+      - ./client:/app
+      - /app/node_modules
+    depends_on:
+      - server
+
+  server:
+    image: iamyogeshmore/jiptl_dashboard_server:v2
+    container_name: jiptl_dashboard_server
+    ports:
+      - "6005:6005"
+    environment:
+      - NODE_ENV=production
+      - PORT=6005
+      - MONGO_URI=mongodb+srv://adityatejas562:4MRuPzvw00sd9XnR@cluster0.esuvgxe.mongodb.net/ESDSI?retryWrites=true&w=majority&appName=Cluster0
+      - CLIENT_URL=http://localhost:5005
+    volumes:
+      - ./server:/app
+      - /app/node_modules
