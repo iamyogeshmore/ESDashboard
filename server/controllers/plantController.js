@@ -91,7 +91,7 @@ exports.getMeasurementData = async (req, res) => {
       TerminalName: terminalName,
       "MeasurandDetails.MeasurandName": measurandName,
     })
-      .select("MeasurandDetails.MeasurandValue TimeStamp")
+      .select("MeasurandDetails.MeasurandValue MeasurandDetails.Unit TimeStamp")
       .lean();
 
     if (!data.length) {
@@ -101,6 +101,7 @@ exports.getMeasurementData = async (req, res) => {
     res.json(
       data.map((d) => ({
         MeasurandValue: d.MeasurandDetails.MeasurandValue,
+        Unit: d.MeasurandDetails.Unit || "",
         TimeStamp: d.TimeStamp,
       }))
     );

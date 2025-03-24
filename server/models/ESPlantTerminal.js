@@ -11,6 +11,7 @@ const ESPlantTerminalSchema = new Schema(
       MeasurandId: Number,
       MeasurandName: String,
       MeasurandValue: Number,
+      Unit: { type: String, default: "" },
     },
     TimeStampId: {
       type: Schema.Types.Mixed,

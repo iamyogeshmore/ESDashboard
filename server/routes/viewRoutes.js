@@ -20,4 +20,7 @@ router.patch(
   viewController.updateWidgetProperties
 );
 
+// -------------------- 6. Update view --------------------
+router.put("/saved-views/:id", viewController.updateSavedView);
+
 module.exports = router;

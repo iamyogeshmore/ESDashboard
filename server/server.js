@@ -11,13 +11,13 @@ const dashboardRoutes = require("./routes/dashboardRoutes");
 const app = express();
 
 // -------------------- Middleware --------------------
-app.use(express.json({ limit: "50mb" })); // Add limit option here
-app.use(express.urlencoded({ limit: "50mb", extended: true })); // For URL-encoded data
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use(
   cors({
-    origin: "http://localhost:5005", // Explicitly allow your frontend origin
-    methods: ["GET", "POST", "PUT", "DELETE"], // Specify allowed methods
-    allowedHeaders: ["Content-Type", "Authorization"], // Specify allowed headers
+    origin: "http://localhost:5005",
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 

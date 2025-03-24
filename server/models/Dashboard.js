@@ -5,7 +5,7 @@ const WidgetSchema = new mongoose.Schema({
   type: {
     type: String,
     required: true,
-    enum: ["number", "graph", "gauge", "image", "datagrid", "text"], // Add "text" here
+    enum: ["number", "graph", "gauge", "image", "datagrid", "text"],
   },
   plant: String,
   terminal: String,
@@ -19,7 +19,20 @@ const WidgetSchema = new mongoose.Schema({
   rows: Number,
   columns: Number,
   imageData: { type: String },
-  textContent: { type: String }, // Add field for plain text content
+  textContent: { type: String },
+  selectedPlant: { type: String },
+  selectedTerminals: [{ type: String }],
+  selectedMeasurements: [{ type: String }],
+  addTimestamp: { type: Boolean, default: false },
+  minRange: { type: Number, default: 0 },
+  maxRange: { type: Number, default: 100 },
+  ranges: [
+    {
+      start: { type: Number },
+      end: { type: Number },
+      color: { type: String },
+    },
+  ],
   layout: {
     i: { type: String, required: true },
     x: { type: Number, required: true },
@@ -44,6 +57,7 @@ const WidgetSchema = new mongoose.Schema({
     borderColor: { type: String, default: "#e0e0e0" },
     borderWidth: { type: String, default: "1px" },
     borderRadius: { type: String, default: "8px" },
+    gaugeColor: { type: String, default: "#1976d2" },
   },
 });
 

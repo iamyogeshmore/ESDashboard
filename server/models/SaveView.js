@@ -1,47 +1,38 @@
 const mongoose = require("mongoose");
-const Schema = mongoose.Schema;
 
-const WidgetSchema = new Schema({
-  plantId: Number,
-  plantName: String,
-  terminalId: Number,
-  terminalName: String,
-  measurandId: Number,
-  measurandName: String,
-  displayName: String,
-  unit: String,
-  widgetType: String,
-  decimalPlaces: Number,
-  graphType: String,
-  xAxisConfiguration: {
-    type: String,
-    value: String,
-  },
-  refreshInterval: Number,
-  properties: Schema.Types.Mixed,
+const widgetSchema = new mongoose.Schema({
+  plantId: { type: String, required: true },
+  plantName: { type: String, required: true },
+  terminalId: { type: String, required: true },
+  terminalName: { type: String, required: true },
+  measurandId: { type: String, required: true },
+  measurandName: { type: String, required: true },
+  displayName: { type: String, required: true },
+  unit: { type: String, default: "" },
+  widgetType: { type: String, required: true, enum: ["number", "graph"] },
+  decimalPlaces: { type: Number, default: 2 },
+  graphType: { type: String, default: null },
+  xAxisConfiguration: { type: Object, default: null },
+  refreshInterval: { type: Number, default: 10000 },
+  properties: { type: Object, default: {} },
   position: {
-    x: Number,
-    y: Number,
-    width: Number,
-    height: Number,
+    x: { type: Number, required: true },
+    y: { type: Number, required: true },
+    width: { type: Number, required: true },
+    height: { type: Number, required: true },
   },
-  i: String,
+  i: { type: String, required: true },
 });
 
-const SaveViewSchema = new Schema(
+const saveViewSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, unique: true },
     description: { type: String, default: "" },
-    widgets: [WidgetSchema],
+    widgets: [widgetSchema],
     plant: { type: String, required: true },
     terminal: { type: String, required: true },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
-const SaveView =
-  mongoose.models.SaveView || mongoose.model("SaveView", SaveViewSchema);
-
-module.exports = SaveView;
+module.exports = mongoose.model("SaveView", saveViewSchema);
