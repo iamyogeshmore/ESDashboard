@@ -95,7 +95,6 @@ const TerminalView = () => {
 
         <Box
           sx={{
-            p: 2,
             flexGrow: 1,
             backgroundColor: theme.palette.background.paper,
             overflow: "auto",
@@ -103,7 +102,7 @@ const TerminalView = () => {
           role="tabpanel"
         >
           <Fade in={true} timeout={500}>
-            <Box sx={{ height: "100%" }}>
+            <Box>
               {activeTab === "CDD" ? (
                 <CDDView aria-labelledby="cdd-tab" />
               ) : (

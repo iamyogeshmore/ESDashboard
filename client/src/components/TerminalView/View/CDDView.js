@@ -741,7 +741,7 @@ const CDDView = () => {
   };
 
   return (
-    <Box sx={{ width: "100%", p: 2 }}>
+    <Box sx={{ width: "100%" }}>
       <Paper sx={{ p: 2 }}>
         <Box sx={{ display: "flex", gap: 2 }}>
           <FormControl size="small" sx={{ minWidth: 200 }}>
