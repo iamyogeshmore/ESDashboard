@@ -1,51 +1,40 @@
 import React, { useState, useEffect } from "react";
 import { Box, Typography, Paper, Tooltip } from "@mui/material";
-
 import axios from "axios";
 
-// --------------- Base API endpoint from environment variables ---------------
 const API_BASE_URL = `${process.env.REACT_APP_API_LOCAL_URL}api`;
 
 const customDefaultWidgetSettings = {
+  backgroundColor: "#cff7ba",
+  borderColor: "#417505",
+  borderRadius: "3px",
+  borderWidth: "1px",
   titleColor: "#000000",
   titleFontFamily: "Georgia",
-  titleFontSize: "25px",
-  titleFontWeight: "normal",
+  titleFontSize: "14px",
   titleFontStyle: "normal",
+  titleFontWeight: "normal",
   titleTextDecoration: "none",
   valueColor: "#d0021b",
   valueFontFamily: "Arial",
-  valueFontSize: "39px",
-  valueFontWeight: "bold",
+  valueFontSize: "24px",
   valueFontStyle: "normal",
+  valueFontWeight: "bold",
   valueTextDecoration: "none",
-  backgroundColor: "#b8e986",
-  borderColor: "#417505",
-  borderWidth: "3px",
-  borderRadius: "3px",
 };
 
-// ------------- Formats a timestamp into a readable string ------------------
+// Simply return the raw timestamp as received from API
 const formatTimestamp = (timestamp) => {
-  if (!timestamp) return "No timestamp available";
-  const date = new Date(timestamp);
-  const year = date.getUTCFullYear();
-  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(date.getUTCDate()).padStart(2, "0");
-  const hours = String(date.getUTCHours()).padStart(2, "0");
-  const minutes = String(date.getUTCMinutes()).padStart(2, "0");
-  const seconds = String(date.getUTCSeconds()).padStart(2, "0");
-  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+  return timestamp || "No timestamp available";
 };
 
-// ------------- Main component to render a number widget on the dashboard ------------------
 const DashboardNumberWidget = ({ data, width, height }) => {
   const [value, setValue] = useState(null);
   const [timestamp, setTimestamp] = useState(null);
+  const [unit, setUnit] = useState(data.unit || ""); // Initialize with data.unit or empty
   const [isHovered, setIsHovered] = useState(false);
   const settings = { ...customDefaultWidgetSettings, ...(data.settings || {}) };
 
-  // ------------- Fetches measurement data periodically every 5 seconds ------------------
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -55,16 +44,17 @@ const DashboardNumberWidget = ({ data, width, height }) => {
         const latestData = response.data[response.data.length - 1];
         setValue(parseFloat(latestData.MeasurandValue) || 0);
         setTimestamp(latestData.TimeStamp);
+        setUnit(latestData.Unit || data.unit || ""); // Fallback to API unit
       } catch (error) {
         console.error("Error fetching measurement data:", error);
         setValue(0);
         setTimestamp(null);
+        setUnit(data.unit || ""); // Reset to data.unit or empty on error
       }
     };
 
     fetchData();
     const interval = setInterval(fetchData, 5000);
-
     return () => clearInterval(interval);
   }, [data.plant, data.terminal, data.measurement]);
 
@@ -163,7 +153,7 @@ const DashboardNumberWidget = ({ data, width, height }) => {
           >
             {value !== null ? value.toFixed(data.decimals || 2) : "Loading..."}
           </Typography>
-          {data.unit && (
+          {unit && (
             <Typography
               sx={{
                 ml: 1,
@@ -171,7 +161,7 @@ const DashboardNumberWidget = ({ data, width, height }) => {
                 fontSize: "clamp(10px, 2vw, 16px)",
               }}
             >
-              {data.unit}
+              {unit} {/* Display API-provided unit */}
             </Typography>
           )}
         </Box>

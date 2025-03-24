@@ -39,7 +39,6 @@ const NAV_ITEMS = {
   view: { path: "/terminal-view", label: "View" },
 };
 
-// ------------ Navbar component: Defines the navigation bar with menu options and theme toggle ------------
 const Navbar = ({ toggleSidebar }) => {
   const { isDarkMode, toggleTheme } = useContext(ThemeContext);
   const [viewAnchorEl, setViewAnchorEl] = useState(null);
@@ -52,7 +51,6 @@ const Navbar = ({ toggleSidebar }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // ------------ getActiveItem function: Determines the currently active navigation item based on URL ------------
   const getActiveItem = useCallback(() => {
     const pathname = location.pathname;
     if (pathname === NAV_ITEMS.dashboard.path) return "dashboard";
@@ -68,21 +66,17 @@ const Navbar = ({ toggleSidebar }) => {
 
   const [activeItem, setActiveItem] = useState(getActiveItem);
 
-  // ------------  Updates active navigation item when URL changes ------------
   useEffect(() => {
     setActiveItem(getActiveItem());
   }, [location.pathname, getActiveItem]);
 
-  // ------------ Updates current time every second ------------
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  // ------------  Opens the view selection menu ------------
   const handleViewClick = (event) => setViewAnchorEl(event.currentTarget);
 
-  // ------------  Handles view selection and navigates to the selected path ------------
   const handleViewSelect = (viewName, path) => {
     setCurrentView(viewName);
     setViewAnchorEl(null);
@@ -92,23 +86,21 @@ const Navbar = ({ toggleSidebar }) => {
     }
   };
 
-  // ------------ Opens the notifications menu ------------
   const handleNotificationsClick = (event) =>
     setNotificationsAnchorEl(event.currentTarget);
 
-  // ------------  Closes the notifications menu ------------
   const handleNotificationsClose = () => setNotificationsAnchorEl(null);
 
-  // ------------  Opens the user menu ------------
   const handleUserClick = (event) => setUserAnchorEl(event.currentTarget);
 
-  // ------------ Closes the user menu ------------
   const handleUserClose = () => setUserAnchorEl(null);
 
-  // ------------ Handles navigation item clicks and routes to the selected path ------------
   const handleNavItemClick = (item, path) => {
     setActiveItem(item);
-    if (path) navigate(path);
+    if (path) {
+      navigate(path);
+      setCurrentView("View"); // Reset view dropdown to default
+    }
   };
 
   return (
@@ -318,6 +310,9 @@ const Navbar = ({ toggleSidebar }) => {
           </Tooltip>
         </Box>
         <Box sx={{ ml: 2 }}>{currentTime.toLocaleString()}</Box>
+        <Typography variant="h6" sx={{ ml: 2, fontWeight: "bold" }}>
+          EnergiSpeak
+        </Typography>
       </Toolbar>
     </StyledAppBar>
   );

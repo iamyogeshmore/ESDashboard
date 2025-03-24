@@ -3,22 +3,22 @@ import { Paper, Typography, Box } from "@mui/material";
 import { styled } from "@mui/material/styles";
 
 const customDefaultWidgetSettings = {
+  backgroundColor: "#cff7ba",
+  borderColor: "#417505",
+  borderRadius: "3px",
+  borderWidth: "1px",
   titleColor: "#000000",
   titleFontFamily: "Georgia",
-  titleFontSize: "20px",
-  titleFontWeight: "normal",
+  titleFontSize: "14px",
   titleFontStyle: "normal",
+  titleFontWeight: "normal",
   titleTextDecoration: "none",
   valueColor: "#d0021b",
   valueFontFamily: "Arial",
-  valueFontSize: "39px",
-  valueFontWeight: "bold",
+  valueFontSize: "24px",
   valueFontStyle: "normal",
+  valueFontWeight: "bold",
   valueTextDecoration: "none",
-  backgroundColor: "#b8e986",
-  borderColor: "#417505",
-  borderWidth: "3px",
-  borderRadius: "3px",
 };
 
 // ------------- Styled component for the paper container with custom settings ------------------
@@ -38,22 +38,6 @@ const DashboardImageWidget = ({ data, width, height }) => {
 
   return (
     <StyledPaper settings={settings} sx={{ width: "100%", height: "100%" }}>
-      <Typography
-        color={settings.titleColor}
-        sx={{
-          fontSize:
-            settings.titleFontSize || `${Math.min(width / 20, height / 10)}px`,
-          fontWeight: settings.titleFontWeight,
-          fontFamily: settings.titleFontFamily,
-          fontStyle: settings.titleFontStyle,
-          textDecoration: settings.titleTextDecoration,
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-        }}
-      >
-        {data.name || "Unnamed Image"}
-      </Typography>
       <Box
         sx={{
           flexGrow: 1,

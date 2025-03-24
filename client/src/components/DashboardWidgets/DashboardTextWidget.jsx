@@ -3,24 +3,23 @@ import { Box, Card, CardContent, Typography } from "@mui/material";
 import { styled } from "@mui/material/styles";
 
 const customDefaultWidgetSettings = {
+  backgroundColor: "#cff7ba",
+  borderColor: "#417505",
+  borderRadius: "3px",
+  borderWidth: "1px",
   titleColor: "#000000",
   titleFontFamily: "Georgia",
-  titleFontSize: "34px",
-  titleFontWeight: "normal",
+  titleFontSize: "14px",
   titleFontStyle: "normal",
+  titleFontWeight: "normal",
   titleTextDecoration: "none",
   valueColor: "#d0021b",
   valueFontFamily: "Arial",
-  valueFontSize: "39px",
-  valueFontWeight: "bold",
+  valueFontSize: "24px",
   valueFontStyle: "normal",
+  valueFontWeight: "bold",
   valueTextDecoration: "none",
-  backgroundColor: "#b8e986",
-  borderColor: "#417505",
-  borderWidth: "3px",
-  borderRadius: "3px",
 };
-
 // ------------- Styled component for the card with custom settings ------------------
 const StyledCard = styled(Card)(({ theme, settings }) => ({
   transition: "all 0.3s",

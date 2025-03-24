@@ -19,14 +19,16 @@ const DashboardGrid = ({
   onLayoutChange,
   handleDeleteClick,
   handleSettingsClick,
+  dashboardName,
+  isPublished,
 }) => {
-  // ------------------ Helper function to render individual widgets -------------
+  // ------------- Renders an individual widget based on its type -------------
   const renderWidget = (widget) => {
-    // Calculate pixel dimensions based on grid units (w = width, h = height)
+    // Calculate pixel dimensions based on grid units
     const pixelWidth = widget.layout.w * ((window.innerWidth - 48) / 12);
     const pixelHeight = widget.layout.h * 50;
 
-    // ------------------ Enhance widget data with default empty arrays -------------
+    // Enhance widget data with default empty arrays if properties are missing
     const enhancedData = {
       ...widget,
       plants: widget.plants || [],
@@ -34,17 +36,18 @@ const DashboardGrid = ({
       measurands: widget.measurands || [],
     };
 
-    // ------------------ Render widget with controls -------------
     return (
       <Box
         sx={{
           position: "relative",
           height: "100%",
-          "&:hover .delete-icon, &:hover .settings-icon": { opacity: 1 },
+          "&:hover .delete-icon, &:hover .settings-icon": {
+            opacity: !isPublished ? 1 : 0, // Show icons only when not published
+          },
         }}
       >
-        {/* ------------------ Switch to render specific widget type ------------- */}
         {(() => {
+          // Switch statement to render appropriate widget component
           switch (widget.type) {
             case "number":
               return (
@@ -94,6 +97,8 @@ const DashboardGrid = ({
                   data={enhancedData}
                   width={pixelWidth}
                   height={pixelHeight}
+                  dashboardName={dashboardName}
+                  isPublished={isPublished}
                 />
               );
             default:
@@ -101,51 +106,55 @@ const DashboardGrid = ({
           }
         })()}
 
-        {/* ------------------ Delete button ------------- */}
-        <IconButton
-          className="delete-icon"
-          size="small"
-          sx={{
-            position: "absolute",
-            top: 8,
-            right: 40,
-            opacity: 0,
-            transition: "opacity 0.2s",
-            backgroundColor: "rgba(0, 0, 0, 0.5)",
-            color: "white",
-            padding: "4px",
-            "&:hover": { backgroundColor: "rgba(211, 47, 47, 0.8)" },
-            "& .MuiSvgIcon-root": { fontSize: "1rem" },
-          }}
-          onClick={() => handleDeleteClick(widget.id)}
-        >
-          <DeleteIcon />
-        </IconButton>
+        {/* Render delete and settings buttons only if dashboard isn't published */}
+        {!isPublished && (
+          <>
+            <IconButton
+              className="delete-icon"
+              size="small"
+              sx={{
+                position: "absolute",
+                top: 8,
+                right: 40,
+                opacity: 0,
+                transition: "opacity 0.2s",
+                backgroundColor: "rgba(0, 0, 0, 0.5)",
+                color: "white",
+                padding: "4px",
+                "&:hover": { backgroundColor: "rgba(211, 47, 47, 0.8)" },
+                "& .MuiSvgIcon-root": { fontSize: "1rem" },
+              }}
+              onClick={() => handleDeleteClick(widget.id)}
+            >
+              <DeleteIcon />
+            </IconButton>
 
-        {/* ------------------ Settings button ------------- */}
-        <IconButton
-          className="settings-icon"
-          size="small"
-          sx={{
-            position: "absolute",
-            top: 8,
-            right: 70,
-            opacity: 0,
-            transition: "opacity 0.2s",
-            backgroundColor: "rgba(0, 0, 0, 0.5)",
-            color: "white",
-            padding: "4px",
-            "&:hover": { backgroundColor: "rgba(33, 150, 243, 0.8)" },
-            "& .MuiSvgIcon-root": { fontSize: "1rem" },
-          }}
-          onClick={() => handleSettingsClick(widget.id)}
-        >
-          <SettingsIcon />
-        </IconButton>
+            <IconButton
+              className="settings-icon"
+              size="small"
+              sx={{
+                position: "absolute",
+                top: 8,
+                right: 70,
+                opacity: 0,
+                transition: "opacity 0.2s",
+                backgroundColor: "rgba(0, 0, 0, 0.5)",
+                color: "white",
+                padding: "4px",
+                "&:hover": { backgroundColor: "rgba(33, 150, 243, 0.8)" },
+                "& .MuiSvgIcon-root": { fontSize: "1rem" },
+              }}
+              onClick={() => handleSettingsClick(widget.id)}
+            >
+              <SettingsIcon />
+            </IconButton>
+          </>
+        )}
       </Box>
     );
   };
 
+  // ------------- Renders the grid layout with all widgets -------------
   return (
     <GridLayout
       className="layout"
@@ -159,7 +168,6 @@ const DashboardGrid = ({
       compactType="vertical"
       preventCollision={false}
     >
-      {/* ------------------ Map widgets to grid items ------------- */}
       {widgets.map((widget) => (
         <div key={widget.layout.i} style={{ overflow: "hidden" }}>
           {renderWidget(widget)}

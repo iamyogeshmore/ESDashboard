@@ -41,7 +41,6 @@ import "chartjs-adapter-date-fns";
 import { Snackbar, Alert } from "@mui/material";
 import DeleteConfirmationDialog from "../DeleteConfirmationDialog";
 
-// ------------------ Register ChartJS components ------------------
 ChartJS.register(
   LineElement,
   PointElement,
@@ -53,7 +52,6 @@ ChartJS.register(
   Filler
 );
 
-// ------------------ Predefined color options for graph lines ------------------
 const colorOptions = [
   { name: "Teal", value: "rgba(0, 128, 128, 1)", bg: "rgba(0, 128, 128, 0.2)" },
   {
@@ -77,7 +75,6 @@ const colorOptions = [
   { name: "Cyan", value: "rgba(0, 255, 255, 1)", bg: "rgba(0, 255, 255, 0.2)" },
 ];
 
-// ------------------ Styled component for graph container ------------------
 const GraphPaper = styled(Paper)(({ theme, isDarkMode, isFullscreen }) => ({
   height: isFullscreen ? "100vh" : "100%",
   width: isFullscreen ? "100vw" : "100%",
@@ -106,7 +103,6 @@ const GraphPaper = styled(Paper)(({ theme, isDarkMode, isFullscreen }) => ({
   overflow: "hidden",
 }));
 
-// ------------------ Styled component for widget header ------------------
 const WidgetHeader = styled(Box)(({ theme, isDarkMode }) => ({
   display: "flex",
   justifyContent: "space-between",
@@ -116,7 +112,6 @@ const WidgetHeader = styled(Box)(({ theme, isDarkMode }) => ({
   cursor: "move",
 }));
 
-// ------------------ Styled component for control buttons container ------------------
 const ControlButtons = styled(Box)(({ theme }) => ({
   display: "flex",
   gap: theme.spacing(0.5),
@@ -126,7 +121,6 @@ const ControlButtons = styled(Box)(({ theme }) => ({
   top: 8,
 }));
 
-// ------------------ Styled component for icon buttons ------------------
 const StyledIconButton = styled(IconButton)(({ theme, isDarkMode }) => ({
   backgroundColor: isDarkMode
     ? "rgba(75, 85, 99, 0.8)"
@@ -138,7 +132,6 @@ const StyledIconButton = styled(IconButton)(({ theme, isDarkMode }) => ({
   },
 }));
 
-// ------------------ Styled component for sidebar ------------------
 const Sidebar = styled(Drawer)(({ theme, isDarkMode }) => ({
   "& .MuiDrawer-paper": {
     width: 250,
@@ -148,7 +141,6 @@ const Sidebar = styled(Drawer)(({ theme, isDarkMode }) => ({
   },
 }));
 
-// ------------------ Styled component for apply button ------------------
 const ApplyButton = styled(Button)(({ theme, isDarkMode }) => ({
   background: isDarkMode
     ? "linear-gradient(45deg, #4b5563 30%, #6b7280 90%)"
@@ -172,7 +164,6 @@ const ApplyButton = styled(Button)(({ theme, isDarkMode }) => ({
   transition: "all 0.3s ease",
 }));
 
-// ------------------ Function to format timestamp for display ------------------
 const formatTimestamp = (timestamp) => {
   if (!timestamp) return "";
   const date = new Date(timestamp);
@@ -187,12 +178,10 @@ const formatTimestamp = (timestamp) => {
   });
 };
 
-// ------------------ Custom tooltip positioner ------------------
 Tooltip.positioners.custom = function (elements, eventPosition) {
   return { x: eventPosition.x, y: eventPosition.y - 20 };
 };
 
-// ------------------ Plugin to draw crosshair on tooltip hover ------------------
 const tooltipCrosshairPlugin = {
   id: "tooltipCrosshair",
   afterDraw: (chart) => {
@@ -231,6 +220,7 @@ const GraphWidget = ({
   terminalInfo,
   xAxisConfiguration,
   onDelete,
+  onOpenProperties,
   availableMeasurands = [],
 }) => {
   const theme = useTheme();
@@ -259,7 +249,6 @@ const GraphWidget = ({
       }, {})
     : { type: "category", value: "timestamp" };
 
-  // ------------------ Fetch graph data periodically ------------------
   useEffect(() => {
     let isMounted = true;
     const fetchData = async () => {
@@ -286,7 +275,6 @@ const GraphWidget = ({
     }
   }, [fetchValue, selectedMeasurands]);
 
-  // ------------------ Handle fullscreen change events ------------------
   useEffect(() => {
     const handleFullscreenChange = () => {
       if (!document.fullscreenElement && isFullscreen) {
@@ -298,7 +286,6 @@ const GraphWidget = ({
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
   }, [isFullscreen]);
 
-  // ------------------ Chart data configuration ------------------
   const chartData = {
     labels:
       selectedMeasurands.length > 0 && graphData[selectedMeasurands[0].name]
@@ -329,7 +316,6 @@ const GraphWidget = ({
     }),
   };
 
-  // ------------------ Chart options configuration ------------------
   const options = {
     responsive: true,
     maintainAspectRatio: false,
@@ -419,7 +405,6 @@ const GraphWidget = ({
 
   ChartJS.register(tooltipCrosshairPlugin);
 
-  // ------------------ Handler functions for UI interactions ------------------
   const handleSidebarToggle = () => setSidebarOpen(!sidebarOpen);
   const handleSidebarClose = () => setSidebarOpen(false);
   const handleMeasurandChange = (event) => setMeasurand(event.target.value);
@@ -429,7 +414,6 @@ const GraphWidget = ({
     setColor("Custom");
   };
 
-  // ------------------ Apply selected measurand and color to graph ------------------
   const handleApplySelection = () => {
     if (!measurand) {
       setSnackbarMessage("Please select a measurand to compare");
@@ -468,7 +452,6 @@ const GraphWidget = ({
     setSnackbarOpen(true);
   };
 
-  // ------------------ Handle delete widget action ------------------
   const handleDeleteClick = () => setDeleteDialogOpen(true);
   const handleDeleteConfirm = () => {
     onDelete(widgetId);
@@ -478,7 +461,6 @@ const GraphWidget = ({
     setSnackbarOpen(true);
   };
 
-  // ------------------ Toggle fullscreen mode ------------------
   const toggleFullscreen = () => {
     if (!isFullscreen) {
       widgetRef.current
@@ -493,11 +475,9 @@ const GraphWidget = ({
     }
   };
 
-  // ------------------ Menu handlers ------------------
   const handleMenuClick = (event) => setAnchorEl(event.currentTarget);
   const handleMenuClose = () => setAnchorEl(null);
 
-  // ------------------ Main render function ------------------
   return (
     <GraphPaper
       ref={widgetRef}
@@ -507,7 +487,6 @@ const GraphWidget = ({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* ------------------ Widget header with title and controls ------------------ */}
       <WidgetHeader
         isDarkMode={isDarkMode}
         className="widget-header"
@@ -567,7 +546,12 @@ const GraphWidget = ({
               />{" "}
               Compare
             </MenuItem>
-            <MenuItem onClick={handleMenuClose}>
+            <MenuItem
+              onClick={() => {
+                onOpenProperties();
+                handleMenuClose();
+              }}
+            >
               <SettingsIcon
                 sx={{
                   fontSize: "0.75rem",
@@ -621,7 +605,6 @@ const GraphWidget = ({
         </ControlButtons>
       </WidgetHeader>
 
-      {/* ------------------ Graph display area ------------------ */}
       <Box
         sx={{
           flexGrow: 1,
@@ -638,7 +621,6 @@ const GraphWidget = ({
         />
       </Box>
 
-      {/* ------------------ Sidebar for comparison options ------------------ */}
       <Sidebar
         anchor="right"
         open={sidebarOpen}
@@ -789,7 +771,6 @@ const GraphWidget = ({
         </Box>
       </Sidebar>
 
-      {/* ------------------ Delete confirmation dialog ------------------ */}
       <DeleteConfirmationDialog
         open={deleteDialogOpen}
         onClose={() => setDeleteDialogOpen(false)}
@@ -798,7 +779,6 @@ const GraphWidget = ({
         message={`Are you sure you want to delete the "${title}" graph widget? This action cannot be undone.`}
       />
 
-      {/* ------------------ Snackbar for user feedback ------------------ */}
       <Snackbar
         open={snackbarOpen}
         autoHideDuration={4000}

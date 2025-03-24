@@ -60,22 +60,22 @@ const API_BASE_URL = `${process.env.REACT_APP_API_LOCAL_URL}api`;
 
 // ------------------ Default widget settings ------------------
 const customDefaultWidgetSettings = {
+  backgroundColor: "#cff7ba",
+  borderColor: "#417505",
+  borderRadius: "3px",
+  borderWidth: "1px",
   titleColor: "#000000",
   titleFontFamily: "Georgia",
-  titleFontSize: "34px",
-  titleFontWeight: "normal",
+  titleFontSize: "14px",
   titleFontStyle: "normal",
+  titleFontWeight: "normal",
   titleTextDecoration: "none",
   valueColor: "#d0021b",
   valueFontFamily: "Arial",
-  valueFontSize: "39px",
-  valueFontWeight: "bold",
+  valueFontSize: "24px",
   valueFontStyle: "normal",
+  valueFontWeight: "bold",
   valueTextDecoration: "none",
-  backgroundColor: "#b8e986",
-  borderColor: "#417505",
-  borderWidth: "3px",
-  borderRadius: "3px",
 };
 
 // ------------------ Predefined color options ------------------

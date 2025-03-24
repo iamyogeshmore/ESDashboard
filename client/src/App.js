@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { CssBaseline, Box } from "@mui/material";
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import { ThemeContextProvider } from "./contexts/ThemeContext";
@@ -13,7 +13,6 @@ import MeasurandView from "./pages/MeasurandView";
 import TableDetailsPage from "./pages/TableDetailsPage";
 import axios from "axios";
 
-// --------------- Base API endpoint from environment variables ---------------
 const API_BASE_URL = `${process.env.REACT_APP_API_LOCAL_URL}api`;
 
 const App = () => {
@@ -45,8 +44,6 @@ const App = () => {
       setDashboardName(name);
       setWidgets(widgets);
       setActiveDashboard(name);
-      // Ensure Dashboard component gets the latest isPublished status
-      // This is handled in Dashboard.js via handleDashboardClick response
     } catch (error) {
       console.error("Error selecting dashboard:", error);
       setShowSnackbar({
@@ -55,6 +52,15 @@ const App = () => {
       });
     }
   };
+
+  // Optional debugging
+  useEffect(() => {
+    console.log("App.js state changed:", {
+      widgets,
+      dashboardName,
+      activeDashboard,
+    });
+  }, [widgets, dashboardName, activeDashboard]);
 
   return (
     <ThemeContextProvider>
@@ -100,7 +106,7 @@ const App = () => {
             />
             <Route path="/terminal-view" element={<TerminalView />} />
             <Route path="/hdd/table/:tableId" element={<TableDetailsPage />} />
-            <Route path="/measurand-view" element={<MeasurandView />} />{" "}
+            <Route path="/measurand-view" element={<MeasurandView />} />
           </Routes>
         </Box>
         <Footer />

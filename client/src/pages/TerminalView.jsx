@@ -1,10 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Box, Tabs, Tab, Paper, Fade, useTheme } from "@mui/material";
 import { styled } from "@mui/material/styles";
 import CDDView from "../components/TerminalView/View/CDDView";
 import HDDView from "../components/TerminalView/View/HDDView";
 
-// ------------------ Styled Tab component ------------------
 const StyledTab = styled(Tab)(({ theme }) => ({
   textTransform: "none",
   fontWeight: 600,
@@ -23,7 +22,6 @@ const StyledTab = styled(Tab)(({ theme }) => ({
   },
 }));
 
-// ------------------ Styled Tabs component ------------------
 const StyledTabs = styled(Tabs)(({ theme }) => ({
   backgroundColor: theme.palette.background.paper,
   borderRadius: "12px 12px 0 0",
@@ -39,7 +37,11 @@ const TerminalView = () => {
   const [activeTab, setActiveTab] = useState("CDD");
   const theme = useTheme();
 
-  // ------------------ Handler for tab change ------------------
+  useEffect(() => {
+    console.log("TerminalView mounted");
+    return () => console.log("TerminalView unmounted");
+  }, []);
+
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
   };
@@ -67,7 +69,6 @@ const TerminalView = () => {
           flexDirection: "column",
         }}
       >
-        {/* ------------------ Tabs for switching views ------------------ */}
         <StyledTabs
           value={activeTab}
           onChange={handleTabChange}
@@ -92,7 +93,6 @@ const TerminalView = () => {
           />
         </StyledTabs>
 
-        {/* ------------------ Content area for selected view ------------------ */}
         <Box
           sx={{
             p: 2,

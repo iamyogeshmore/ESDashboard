@@ -11,14 +11,14 @@ import {
   Select,
   MenuItem,
   Divider,
-  Snackbar,
-  Alert,
   Grid,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
   IconButton,
+  FormControlLabel,
+  Checkbox,
 } from "@mui/material";
 import {
   FormatBold,
@@ -33,31 +33,28 @@ import {
 } from "@mui/icons-material";
 import { SketchPicker } from "react-color";
 
-// --------------- Base API endpoint from environment variables ---------------
 const BASE_URL = `${process.env.REACT_APP_API_LOCAL_URL}api`;
 
-// ------------------ Default widget settings ------------------
 const customDefaultWidgetSettings = {
+  backgroundColor: "#cff7ba",
+  borderColor: "#417505",
+  borderRadius: "3px",
+  borderWidth: "1px",
   titleColor: "#000000",
   titleFontFamily: "Georgia",
-  titleFontSize: "34px",
-  titleFontWeight: "normal",
+  titleFontSize: "24px",
   titleFontStyle: "normal",
+  titleFontWeight: "normal",
   titleTextDecoration: "none",
   valueColor: "#d0021b",
   valueFontFamily: "Arial",
-  valueFontSize: "39px",
-  valueFontWeight: "bold",
+  valueFontSize: "24px",
   valueFontStyle: "normal",
+  valueFontWeight: "bold",
   valueTextDecoration: "none",
-  backgroundColor: "#b8e986",
-  borderColor: "#417505",
-  borderWidth: "3px",
-  borderRadius: "3px",
   widgetName: "Custom Widget",
 };
 
-// ------------------ Utility function to adjust size ------------------
 const adjustSize = (currentSize, increment = true, min = 0) => {
   const sizeStr =
     typeof currentSize === "string" ? currentSize : `${currentSize || 0}px`;
@@ -75,11 +72,8 @@ const WidgetProperties = ({ onApply, selectedWidget, viewId, onClose }) => {
   const [templateNameError, setTemplateNameError] = useState("");
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
   const [currentColorField, setCurrentColorField] = useState(null);
-  const [snackbarOpen, setSnackbarOpen] = useState(false);
-  const [snackbarMessage, setSnackbarMessage] = useState("");
-  const [snackbarSeverity, setSnackbarSeverity] = useState("success");
+  const [applyToAll, setApplyToAll] = useState(false); // New state for checkbox
 
-  // ------------------ Effect to load saved templates and default settings ------------------
   useEffect(() => {
     const loadSavedTemplates = () => {
       const templates = Object.keys(localStorage)
@@ -100,7 +94,6 @@ const WidgetProperties = ({ onApply, selectedWidget, viewId, onClose }) => {
     }
   }, []);
 
-  // ------------------ Effect to load widget-specific settings ------------------
   useEffect(() => {
     if (selectedWidget) {
       const widgetSettings = localStorage.getItem(
@@ -121,12 +114,10 @@ const WidgetProperties = ({ onApply, selectedWidget, viewId, onClose }) => {
     }
   }, [selectedWidget]);
 
-  // ------------------ Handler for input changes ------------------
   const handleInputChange = (field, value) => {
     setSettings((prev) => ({ ...prev, [field]: value }));
   };
 
-  // ------------------ Handler for size adjustments ------------------
   const handleSizeChange = (field, increment, min = 1) => {
     setSettings((prev) => ({
       ...prev,
@@ -134,20 +125,17 @@ const WidgetProperties = ({ onApply, selectedWidget, viewId, onClose }) => {
     }));
   };
 
-  // ------------------ Handler for color changes ------------------
   const handleColorChange = (color) => {
     if (currentColorField) {
       setSettings((prev) => ({ ...prev, [currentColorField]: color.hex }));
     }
   };
 
-  // ------------------ Handler to open color picker ------------------
   const handleColorPickerOpen = (field) => {
     setCurrentColorField(field);
     setColorPickerOpen(true);
   };
 
-  // ------------------ Handler to toggle text formatting ------------------
   const toggleTextFormat = (field, value) => {
     setSettings((prev) => ({
       ...prev,
@@ -155,42 +143,34 @@ const WidgetProperties = ({ onApply, selectedWidget, viewId, onClose }) => {
     }));
   };
 
-  // ------------------ Function to save settings ------------------
   const saveSettings = async () => {
     try {
-      localStorage.setItem("widgetSettings", JSON.stringify(settings));
+      const updatedSettings = { ...settings };
+      localStorage.setItem("widgetSettings", JSON.stringify(updatedSettings));
       if (selectedWidget) {
         localStorage.setItem(
           `widgetSettings_${selectedWidget}`,
-          JSON.stringify(settings)
+          JSON.stringify(updatedSettings)
         );
       }
 
       if (viewId && selectedWidget) {
         const response = await axios.patch(
           `${BASE_URL}/saved-views/${viewId}/widgets/${selectedWidget}`,
-          settings
+          updatedSettings
         );
         console.log("Updated view:", response.data);
       }
 
-      setSnackbarMessage("Settings saved successfully");
-      setSnackbarSeverity("success");
-      setSnackbarOpen(true);
-
-      if (onApply) onApply(settings);
+      // Pass applyToAll along with settings
+      if (onApply) onApply(updatedSettings, applyToAll);
       if (onClose) onClose();
     } catch (error) {
       console.error("Error saving widget settings:", error);
-      setSnackbarMessage(
-        error.response?.data?.message || "Error saving settings"
-      );
-      setSnackbarSeverity("error");
-      setSnackbarOpen(true);
+      throw error;
     }
   };
 
-  // ------------------ Function to load a template ------------------
   const loadTemplate = (templateName) => {
     setSelectedTemplate(templateName);
     if (templateName) {
@@ -200,27 +180,19 @@ const WidgetProperties = ({ onApply, selectedWidget, viewId, onClose }) => {
         );
         if (template) {
           setSettings(template);
-          setSnackbarMessage(`Template "${templateName}" loaded successfully`);
-          setSnackbarSeverity("success");
-          setSnackbarOpen(true);
         }
       } catch (error) {
         console.error("Error loading template:", error);
-        setSnackbarMessage("Error loading template");
-        setSnackbarSeverity("error");
-        setSnackbarOpen(true);
       }
     }
   };
 
-  // ------------------ Handler to open save template dialog ------------------
   const handleOpenSaveDialog = () => {
     setNewTemplateName(settings.widgetName || "");
     setTemplateNameError("");
     setSaveDialogOpen(true);
   };
 
-  // ------------------ Function to validate template name ------------------
   const validateTemplateName = (name) => {
     if (!name.trim()) return "Template name cannot be empty.";
     if (savedTemplates.includes(name))
@@ -228,14 +200,12 @@ const WidgetProperties = ({ onApply, selectedWidget, viewId, onClose }) => {
     return "";
   };
 
-  // ------------------ Handler for template name changes ------------------
   const handleTemplateNameChange = (e) => {
     const name = e.target.value;
     setNewTemplateName(name);
     setTemplateNameError(validateTemplateName(name));
   };
 
-  // ------------------ Function to save settings as a template ------------------
   const saveAsTemplate = () => {
     const errorMessage = validateTemplateName(newTemplateName);
     if (errorMessage) {
@@ -253,14 +223,9 @@ const WidgetProperties = ({ onApply, selectedWidget, viewId, onClose }) => {
     ];
     setSavedTemplates(updatedTemplates);
     setSelectedTemplate(newTemplateName);
-
     setSaveDialogOpen(false);
-    setSnackbarMessage(`Template "${newTemplateName}" saved successfully.`);
-    setSnackbarSeverity("success");
-    setSnackbarOpen(true);
   };
 
-  // ------------------ Function to delete a template ------------------
   const deleteTemplate = () => {
     if (!selectedTemplate) return;
     if (
@@ -271,13 +236,9 @@ const WidgetProperties = ({ onApply, selectedWidget, viewId, onClose }) => {
       localStorage.removeItem(`widgetTemplate_${selectedTemplate}`);
       setSavedTemplates(savedTemplates.filter((t) => t !== selectedTemplate));
       setSelectedTemplate("");
-      setSnackbarMessage(`Template "${selectedTemplate}" deleted successfully`);
-      setSnackbarSeverity("success");
-      setSnackbarOpen(true);
     }
   };
 
-  // ------------------ Widget preview component ------------------
   const WidgetPreview = () => (
     <Paper
       elevation={2}
@@ -328,7 +289,6 @@ const WidgetProperties = ({ onApply, selectedWidget, viewId, onClose }) => {
   return (
     <Box sx={{ p: 3 }}>
       <Paper elevation={3} sx={{ p: 3, borderRadius: 2, position: "relative" }}>
-        {/* ------------------ Header with title and close button ------------------ */}
         <Typography variant="h5" gutterBottom>
           Widget Properties {selectedWidget ? `for ${selectedWidget}` : ""}
         </Typography>
@@ -347,7 +307,6 @@ const WidgetProperties = ({ onApply, selectedWidget, viewId, onClose }) => {
         </IconButton>
 
         <Grid container spacing={3}>
-          {/* ------------------ Settings configuration panel ------------------ */}
           <Grid item xs={12} md={8}>
             <Typography
               variant="h6"
@@ -683,7 +642,6 @@ const WidgetProperties = ({ onApply, selectedWidget, viewId, onClose }) => {
 
             <Divider sx={{ my: 2 }} />
 
-            {/* ------------------ Template management section ------------------ */}
             <Typography variant="h6" sx={{ mb: 1 }}>
               Templates
             </Typography>
@@ -723,7 +681,6 @@ const WidgetProperties = ({ onApply, selectedWidget, viewId, onClose }) => {
             </Box>
           </Grid>
 
-          {/* ------------------ Preview section ------------------ */}
           <Grid item xs={12} md={4}>
             <Typography variant="h6" sx={{ mb: 1 }}>
               Preview
@@ -732,7 +689,19 @@ const WidgetProperties = ({ onApply, selectedWidget, viewId, onClose }) => {
           </Grid>
         </Grid>
 
-        {/* ------------------ Action buttons ------------------ */}
+        {/* Add the Apply to All checkbox */}
+        <Box sx={{ mt: 2 }}>
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={applyToAll}
+                onChange={(e) => setApplyToAll(e.target.checked)}
+              />
+            }
+            label="Apply to all widgets in this view"
+          />
+        </Box>
+
         <Box
           sx={{ mt: 3, display: "flex", justifyContent: "flex-end", gap: 2 }}
         >
@@ -744,7 +713,6 @@ const WidgetProperties = ({ onApply, selectedWidget, viewId, onClose }) => {
           </Button>
         </Box>
 
-        {/* ------------------ Color picker dialog ------------------ */}
         {colorPickerOpen && (
           <Box
             sx={{
@@ -768,7 +736,6 @@ const WidgetProperties = ({ onApply, selectedWidget, viewId, onClose }) => {
           </Box>
         )}
 
-        {/* ------------------ Save template dialog ------------------ */}
         <Dialog open={saveDialogOpen} onClose={() => setSaveDialogOpen(false)}>
           <DialogTitle>Save As Template</DialogTitle>
           <DialogContent>
@@ -790,21 +757,6 @@ const WidgetProperties = ({ onApply, selectedWidget, viewId, onClose }) => {
             </Button>
           </DialogActions>
         </Dialog>
-
-        {/* ------------------ Snackbar for feedback ------------------ */}
-        <Snackbar
-          open={snackbarOpen}
-          autoHideDuration={6000}
-          onClose={() => setSnackbarOpen(false)}
-        >
-          <Alert
-            onClose={() => setSnackbarOpen(false)}
-            severity={snackbarSeverity}
-            sx={{ width: "100%" }}
-          >
-            {snackbarMessage}
-          </Alert>
-        </Snackbar>
       </Paper>
     </Box>
   );

@@ -1,13 +1,11 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import {
   Box,
   Typography,
   Paper,
   IconButton,
-  Dialog,
-  DialogContent,
   useTheme,
   Tooltip,
   Menu,
@@ -18,31 +16,28 @@ import {
   Settings as SettingsIcon,
   Delete as DeleteIcon,
 } from "@mui/icons-material";
-import WidgetProperties from "../WidgetProperties";
 import DeleteConfirmationDialog from "../DeleteConfirmationDialog";
 
-// ------------------ Default widget settings ------------------
 const defaultWidgetSettings = {
-  titleColor: "#666666",
-  titleFontFamily: "Roboto",
-  titleFontSize: "14px",
-  titleFontWeight: "normal",
-  titleFontStyle: "normal",
-  titleTextDecoration: "none",
-  valueColor: "#1976d2",
-  valueFontFamily: "Roboto",
-  valueFontSize: "24px",
-  valueFontWeight: "bold",
-  valueFontStyle: "normal",
-  valueTextDecoration: "none",
-  backgroundColor: "#ffffff",
-  borderColor: "#e0e0e0",
+  backgroundColor: "#cff7ba",
+  borderColor: "#417505",
+  borderRadius: "3px",
   borderWidth: "1px",
-  borderRadius: "8px",
+  titleColor: "#000000",
+  titleFontFamily: "Georgia",
+  titleFontSize: "24px",
+  titleFontStyle: "normal",
+  titleFontWeight: "normal",
+  titleTextDecoration: "none",
+  valueColor: "#d0021b",
+  valueFontFamily: "Arial",
+  valueFontSize: "24px",
+  valueFontStyle: "normal",
+  valueFontWeight: "bold",
+  valueTextDecoration: "none",
   widgetName: "Default Widget",
 };
 
-// ------------------ Main NumberWidget component ------------------
 const NumberWidget = ({
   title,
   widgetId,
@@ -51,6 +46,7 @@ const NumberWidget = ({
   value: externalValue,
   timestamp: externalTimestamp,
   onDelete,
+  onOpenProperties,
   ...initialProperties
 }) => {
   const theme = useTheme();
@@ -58,92 +54,82 @@ const NumberWidget = ({
   const [isHovered, setIsHovered] = useState(false);
   const [internalValue, setInternalValue] = useState(null);
   const [internalTimestamp, setInternalTimestamp] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [styles, setStyles] = useState({
-    ...defaultWidgetSettings,
-    ...initialProperties,
-  });
-  const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const menuButtonRef = useRef(null); // Ref to manage focus
 
-  // ------------------ Effect to fetch value if not provided externally ------------------
+  const styles = useMemo(() => {
+    const storedSettings = widgetId
+      ? localStorage.getItem(`widgetSettings_${widgetId}`)
+      : null;
+    const baseStyles = {
+      ...defaultWidgetSettings,
+      ...(storedSettings ? JSON.parse(storedSettings) : {}),
+      ...initialProperties,
+    };
+    return isDarkMode
+      ? {
+          ...baseStyles,
+          titleColor: baseStyles.titleColor,
+          valueColor: baseStyles.valueColor,
+          backgroundColor: baseStyles.backgroundColor,
+          borderColor: baseStyles.borderColor,
+        }
+      : baseStyles;
+  }, [widgetId, initialProperties, isDarkMode]);
+
   useEffect(() => {
+    if (!fetchValue || externalValue !== undefined) return;
+
+    let isMounted = true;
+    const controller = new AbortController();
+
     const loadValue = async () => {
-      setLoading(true);
-      setError(null);
       try {
-        const fetchedData = await fetchValue();
-        setInternalValue(fetchedData.value);
-        setInternalTimestamp(fetchedData.timestamp);
+        const fetchedData = await fetchValue({ signal: controller.signal });
+        if (
+          fetchedData.value !== null &&
+          fetchedData.value !== undefined &&
+          !isNaN(fetchedData.value) &&
+          isMounted
+        ) {
+          setInternalValue(fetchedData.value);
+          setInternalTimestamp(fetchedData.timestamp);
+          setError(null);
+        }
       } catch (err) {
-        setError("Failed to fetch value");
-        console.error("Error fetching value:", err);
-      } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) {
+          setError("Failed to fetch value");
+          console.error("Error fetching value:", err);
+        }
       }
     };
-    if (fetchValue && externalValue === undefined) loadValue();
-    else setLoading(false);
-  }, [fetchValue, externalValue]);
 
-  // ------------------ Effect to load saved settings from localStorage ------------------
-  useEffect(() => {
-    let widgetSettings = widgetId
-      ? localStorage.getItem(`widgetSettings_${widgetId}`)
-      : localStorage.getItem("widgetSettings");
-    if (widgetSettings) {
-      try {
-        const parsedSettings = JSON.parse(widgetSettings);
-        setStyles((prev) => ({ ...prev, ...parsedSettings }));
-      } catch (error) {
-        console.error("Error parsing widget settings:", error);
-      }
-    }
-  }, [widgetId]);
+    loadValue();
+    const interval = setInterval(loadValue, 1000);
 
-  // ------------------ Effect to adjust styles for dark mode ------------------
-  useEffect(() => {
-    if (isDarkMode) {
-      setStyles((prev) => ({
-        ...prev,
-        titleColor: prev.titleColor === "#666666" ? "#e0e0e0" : prev.titleColor,
-        valueColor: prev.valueColor === "#1976d2" ? "#90caf9" : prev.valueColor,
-        backgroundColor:
-          prev.backgroundColor === "#ffffff" ? "#1e1e1e" : prev.backgroundColor,
-        borderColor:
-          prev.borderColor === "#e0e0e0" ? "#424242" : prev.borderColor,
-      }));
-    }
-  }, [isDarkMode]);
+    return () => {
+      isMounted = false;
+      controller.abort();
+      clearInterval(interval);
+    };
+  }, [fetchValue]);
 
-  // ------------------ Handler to apply new settings ------------------
-  const handleApplySettings = (newSettings) => {
-    setStyles(newSettings);
-    if (widgetId)
-      localStorage.setItem(
-        `widgetSettings_${widgetId}`,
-        JSON.stringify(newSettings)
-      );
-    else localStorage.setItem("widgetSettings", JSON.stringify(newSettings));
-    setSettingsDialogOpen(false);
-  };
-
-  // ------------------ Determine display value and timestamp ------------------
   const displayValue =
     externalValue !== undefined ? externalValue : internalValue;
   const displayTimestamp =
     externalTimestamp !== undefined ? externalTimestamp : internalTimestamp;
   const tooltipTitle = displayTimestamp
-    ? `Last updated: ${new Date(displayTimestamp).toLocaleString()}`
+    ? `Last updated: ${displayTimestamp}`
     : "No timestamp available";
 
-  // ------------------ Menu handlers ------------------
   const handleMenuClick = (event) => setAnchorEl(event.currentTarget);
-  const handleMenuClose = () => setAnchorEl(null);
-
-  // ------------------ Delete handlers ------------------
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+    // Return focus to the menu button when the menu closes
+    menuButtonRef.current?.focus();
+  };
   const handleDeleteClick = () => {
     setDeleteDialogOpen(true);
     handleMenuClose();
@@ -152,9 +138,7 @@ const NumberWidget = ({
     onDelete(widgetId || title);
     setDeleteDialogOpen(false);
   };
-  const handleDeleteCancel = () => {
-    setDeleteDialogOpen(false);
-  };
+  const handleDeleteCancel = () => setDeleteDialogOpen(false);
 
   return (
     <Tooltip title={tooltipTitle} arrow>
@@ -163,8 +147,8 @@ const NumberWidget = ({
         sx={{
           height: "100%",
           width: "100%",
-          minHeight: "120px",
-          minWidth: "150px",
+          minHeight: "100px",
+          minWidth: "120px",
           p: 2,
           textAlign: "center",
           bgcolor: styles.backgroundColor,
@@ -181,7 +165,6 @@ const NumberWidget = ({
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        {/* ------------------ Widget header with title and menu ------------------ */}
         <Box sx={{ flexShrink: 0 }}>
           <Box
             className="widget-header"
@@ -225,6 +208,7 @@ const NumberWidget = ({
             >
               <IconButton
                 onClick={handleMenuClick}
+                ref={menuButtonRef} // Attach ref to the button
                 sx={{
                   bgcolor: isDarkMode
                     ? "rgba(66,66,66,0.8)"
@@ -235,6 +219,7 @@ const NumberWidget = ({
                       : "rgba(225,225,225,0.9)",
                   },
                 }}
+                aria-label="More options"
               >
                 <MoreVertIcon
                   sx={{
@@ -247,10 +232,13 @@ const NumberWidget = ({
                 anchorEl={anchorEl}
                 open={Boolean(anchorEl)}
                 onClose={handleMenuClose}
+                MenuListProps={{
+                  "aria-labelledby": "more-options-button",
+                }}
               >
                 <MenuItem
                   onClick={() => {
-                    setSettingsDialogOpen(true);
+                    onOpenProperties();
                     handleMenuClose();
                   }}
                 >
@@ -260,7 +248,7 @@ const NumberWidget = ({
                       mr: 1,
                       color: isDarkMode ? "#e0e0e0" : "#757575",
                     }}
-                  />{" "}
+                  />
                   Settings
                 </MenuItem>
                 <MenuItem onClick={handleDeleteClick}>
@@ -270,7 +258,7 @@ const NumberWidget = ({
                       mr: 1,
                       color: isDarkMode ? "#ef5350" : "#d32f2f",
                     }}
-                  />{" "}
+                  />
                   Delete
                 </MenuItem>
               </Menu>
@@ -278,7 +266,6 @@ const NumberWidget = ({
           </Box>
         </Box>
 
-        {/* ------------------ Value display area ------------------ */}
         <Box
           sx={{
             flexGrow: 1,
@@ -303,32 +290,14 @@ const NumberWidget = ({
               maxWidth: "100%",
             }}
           >
-            {loading
-              ? "Loading..."
-              : error
+            {error
               ? "Error"
               : displayValue !== null && displayValue !== undefined
               ? displayValue.toFixed(styles.decimalPlaces || 2)
-              : "N/A"}
+              : "Loading..."}
           </Typography>
         </Box>
 
-        {/* ------------------ Settings dialog ------------------ */}
-        <Dialog
-          open={settingsDialogOpen}
-          onClose={() => setSettingsDialogOpen(false)}
-          maxWidth="lg"
-          fullWidth
-        >
-          <DialogContent sx={{ p: 0 }}>
-            <WidgetProperties
-              onApply={handleApplySettings}
-              selectedWidget={widgetId || title}
-            />
-          </DialogContent>
-        </Dialog>
-
-        {/* ------------------ Delete confirmation dialog ------------------ */}
         <DeleteConfirmationDialog
           open={deleteDialogOpen}
           onClose={handleDeleteCancel}

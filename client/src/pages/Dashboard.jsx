@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { Box, CircularProgress } from "@mui/material";
+import { Box, CircularProgress, Switch, FormControlLabel } from "@mui/material";
 import DashboardToolbar from "../components/Dashboard/DashboardToolbar";
 import DashboardGrid from "../components/Dashboard/DashboardGrid";
 import WidgetFormDialog from "../components/Dashboard/WidgetFormDialog";
@@ -9,7 +9,6 @@ import DeleteConfirmationDialog from "../components/DeleteConfirmationDialog";
 import SnackbarComponent from "../components/Dashboard/SnackbarComponent";
 import PropertiesDialog from "../components/Dashboard/PropertiesDialog";
 
-// --------------- Base API endpoint from environment variables ---------------
 const API_BASE_URL = `${process.env.REACT_APP_API_LOCAL_URL}api`;
 
 const Dashboard = ({
@@ -40,8 +39,8 @@ const Dashboard = ({
   const [originalWidgets, setOriginalWidgets] = useState([]);
   const [openPropertiesDialog, setOpenPropertiesDialog] = useState(false);
   const [selectedWidgetId, setSelectedWidgetId] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
 
-  // ------------------ Effect to load initial dashboard and plants ------------------
   useEffect(() => {
     const loadInitialDashboard = async () => {
       try {
@@ -79,7 +78,6 @@ const Dashboard = ({
       }
     };
 
-    // ----------------- Fetch plants -----------------
     const fetchPlants = async () => {
       try {
         const response = await axios.get(`${API_BASE_URL}/plants`);
@@ -93,7 +91,6 @@ const Dashboard = ({
     fetchPlants();
   }, [setWidgets, setDashboardName, setActiveDashboard]);
 
-  // ------------------ Effect to update dashboard from props ------------------
   useEffect(() => {
     const updateDashboardFromProps = async () => {
       if (dashboardName) {
@@ -114,7 +111,6 @@ const Dashboard = ({
     updateDashboardFromProps();
   }, [dashboardName, setWidgets, setActiveDashboard]);
 
-  // ------------------ Effect to sync snackbar from props ------------------
   useEffect(() => {
     if (showSnackbar.message) {
       setSnackbarOpen(true);
@@ -123,14 +119,16 @@ const Dashboard = ({
     }
   }, [showSnackbar]);
 
-  // ------------------ Effect to detect widget changes ------------------
   useEffect(() => {
     const widgetsChanged =
       JSON.stringify(widgets) !== JSON.stringify(originalWidgets);
     setHasChanges(widgetsChanged);
   }, [widgets, originalWidgets]);
 
-  // ------------------ Function to fetch terminals ------------------
+  useEffect(() => {
+    setIsEditing(!isPublished);
+  }, [isPublished]);
+
   const fetchTerminals = async (plantName) => {
     try {
       const response = await axios.get(
@@ -142,7 +140,6 @@ const Dashboard = ({
     }
   };
 
-  // ------------------ Function to fetch measurands ------------------
   const fetchMeasurands = async (plantName, terminalName) => {
     try {
       const response = await axios.get(
@@ -154,13 +151,11 @@ const Dashboard = ({
     }
   };
 
-  // ------------------ Handler for opening settings dialog ------------------
   const handleSettingsClick = (widgetId) => {
     setSelectedWidgetId(widgetId);
     setOpenPropertiesDialog(true);
   };
 
-  // ------------------ Handler for applying widget settings ------------------
   const handleApplySettings = async (settings) => {
     const updatedWidgets = widgets.map((widget) =>
       widget.id === selectedWidgetId ? { ...widget, settings } : widget
@@ -182,14 +177,12 @@ const Dashboard = ({
     setSelectedWidgetId(null);
   };
 
-  // ------------------ Utility function to trigger snackbar ------------------
   const triggerSnackbar = (message, severity = "success") => {
     setSnackbarMessage(message);
     setSnackbarSeverity(severity);
     setSnackbarOpen(true);
   };
 
-  // ------------------ Handler for form field changes ------------------
   const handleFormChange = (field, value) => {
     if (field === "plant") {
       fetchTerminals(value);
@@ -212,14 +205,19 @@ const Dashboard = ({
     }
   };
 
-  // ------------------ Handler for saving a new widget ------------------
   const handleSaveWidget = async () => {
     const newWidget = {
       id: Date.now(),
       type: widgetType,
       ...formData,
       measurands,
-      layout: { i: Date.now().toString(), x: 0, y: Infinity, w: 3, h: 4 },
+      layout: {
+        i: Date.now().toString(),
+        x: 0,
+        y: Infinity,
+        w: widgetType === "datagrid" ? 6 : 3,
+        h: widgetType === "datagrid" ? 6 : 4,
+      },
     };
     try {
       const updatedWidgets = [...widgets, newWidget];
@@ -236,7 +234,6 @@ const Dashboard = ({
     }
   };
 
-  // ------------------ Handler for confirming widget deletion ------------------
   const handleDeleteConfirm = async () => {
     if (widgetToDelete) {
       try {
@@ -261,7 +258,6 @@ const Dashboard = ({
     }
   };
 
-  // ------------------ Handler for saving a new dashboard ------------------
   const handleSaveDashboard = async () => {
     if (!dashboardName.trim()) {
       triggerSnackbar("Please enter a dashboard name", "warning");
@@ -292,7 +288,6 @@ const Dashboard = ({
     }
   };
 
-  // ------------------ Handler for updating an existing dashboard ------------------
   const handleUpdateDashboard = async () => {
     if (!dashboardName) return;
     try {
@@ -312,7 +307,6 @@ const Dashboard = ({
     }
   };
 
-  // ------------------ Handler for publishing a dashboard ------------------
   const handlePublish = async () => {
     if (!dashboardName) {
       triggerSnackbar("Please save the dashboard with a name first", "warning");
@@ -333,20 +327,21 @@ const Dashboard = ({
     }
   };
 
-  // ------------------ Handler for icon clicks in toolbar ------------------
+  const handleEditToggle = (event) => {
+    setIsEditing(event.target.checked);
+  };
+
   const handleIconClick = (type) => {
     setWidgetType(type);
     setFormData({});
     setOpenWidgetDialog(true);
   };
 
-  // ------------------ Handler for save button ------------------
   const handleSave = () => {
     if (dashboardName) handleUpdateDashboard();
     else setOpenSaveDialog(true);
   };
 
-  // ------------------ Handler for layout changes in grid ------------------
   const onLayoutChange = (newLayout) => {
     const updatedWidgets = widgets.map((widget) => {
       const layout = newLayout.find((l) => l.i === widget.layout.i);
@@ -363,13 +358,11 @@ const Dashboard = ({
     localStorage.setItem("dashboardWidgets", JSON.stringify(updatedWidgets));
   };
 
-  // ------------------ Handler for initiating widget deletion ------------------
   const handleDeleteClick = (widgetId) => {
     setWidgetToDelete(widgetId);
     setDeleteDialogOpen(true);
   };
 
-  // ------------------ Loading state render ------------------
   if (loading) {
     return (
       <Box
@@ -387,16 +380,30 @@ const Dashboard = ({
 
   return (
     <Box sx={{ flexGrow: 1, minHeight: "calc(100vh - 128px)", padding: 2 }}>
-      {/* ------------------ Dashboard toolbar ------------------ */}
-      <DashboardToolbar
-        dashboardName={dashboardName}
-        isPublished={isPublished}
-        hasChanges={hasChanges}
-        handleIconClick={handleIconClick}
-        handleSave={handleSave}
-        handlePublish={handlePublish}
-      />
-      {/* ------------------ Snackbar for feedback ------------------ */}
+      {isEditing && (
+        <DashboardToolbar
+          dashboardName={dashboardName}
+          isPublished={isPublished}
+          hasChanges={hasChanges}
+          handleIconClick={handleIconClick}
+          handleSave={handleSave}
+          handlePublish={handlePublish}
+        />
+      )}
+      {isPublished && (
+        <Box sx={{ mb: 2 }}>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={isEditing}
+                onChange={handleEditToggle}
+                color="primary"
+              />
+            }
+            label="Edit Mode"
+          />
+        </Box>
+      )}
       <SnackbarComponent
         open={snackbarOpen}
         message={snackbarMessage}
@@ -406,51 +413,52 @@ const Dashboard = ({
           setShowSnackbar({ message: "", severity: "success" });
         }}
       />
-      {/* ------------------ Dashboard grid ------------------ */}
       <DashboardGrid
         widgets={widgets}
         onLayoutChange={onLayoutChange}
         handleDeleteClick={handleDeleteClick}
         handleSettingsClick={handleSettingsClick}
-      />
-      {/* ------------------ Widget creation dialog ------------------ */}
-      <WidgetFormDialog
-        open={openWidgetDialog}
-        onClose={() => setOpenWidgetDialog(false)}
-        widgetType={widgetType}
-        formData={formData}
-        plants={plants}
-        terminals={terminals}
-        measurands={measurands}
-        handleFormChange={handleFormChange}
-        handleSaveWidget={handleSaveWidget}
-      />
-      {/* ------------------ Save dashboard dialog ------------------ */}
-      <SaveDashboardDialog
-        open={openSaveDialog}
-        onClose={() => setOpenSaveDialog(false)}
         dashboardName={dashboardName}
-        setDashboardName={setDashboardName}
-        handleSaveDashboard={handleSaveDashboard}
+        isPublished={!isEditing}
       />
-      {/* ------------------ Delete confirmation dialog ------------------ */}
-      <DeleteConfirmationDialog
-        open={deleteDialogOpen}
-        onClose={() => {
-          setDeleteDialogOpen(false);
-          setWidgetToDelete(null);
-        }}
-        onConfirm={handleDeleteConfirm}
-        title="Delete Widget"
-        message="Are you sure you want to delete this widget? This action cannot be undone."
-      />
-      {/* ------------------ Properties settings dialog ------------------ */}
-      <PropertiesDialog
-        open={openPropertiesDialog}
-        onClose={() => setOpenPropertiesDialog(false)}
-        selectedWidgetId={selectedWidgetId}
-        handleApplySettings={handleApplySettings}
-      />
+      {isEditing && (
+        <>
+          <WidgetFormDialog
+            open={openWidgetDialog}
+            onClose={() => setOpenWidgetDialog(false)}
+            widgetType={widgetType}
+            formData={formData}
+            plants={plants}
+            terminals={terminals}
+            measurands={measurands}
+            handleFormChange={handleFormChange}
+            handleSaveWidget={handleSaveWidget}
+          />
+          <SaveDashboardDialog
+            open={openSaveDialog}
+            onClose={() => setOpenSaveDialog(false)}
+            dashboardName={dashboardName}
+            setDashboardName={setDashboardName}
+            handleSaveDashboard={handleSaveDashboard}
+          />
+          <DeleteConfirmationDialog
+            open={deleteDialogOpen}
+            onClose={() => {
+              setDeleteDialogOpen(false);
+              setWidgetToDelete(null);
+            }}
+            onConfirm={handleDeleteConfirm}
+            title="Delete Widget"
+            message="Are you sure you want to delete this widget? This action cannot be undone."
+          />
+          <PropertiesDialog
+            open={openPropertiesDialog}
+            onClose={() => setOpenPropertiesDialog(false)}
+            selectedWidgetId={selectedWidgetId}
+            handleApplySettings={handleApplySettings}
+          />
+        </>
+      )}
     </Box>
   );
 };

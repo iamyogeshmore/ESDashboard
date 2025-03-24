@@ -19,29 +19,27 @@ import axios from "axios";
 
 ChartJS.register(ArcElement, ChartTooltip, Legend);
 
-// --------------- Base API endpoint from environment variables ---------------
 const API_BASE_URL = `${process.env.REACT_APP_API_LOCAL_URL}api`;
 
 const customDefaultWidgetSettings = {
+  backgroundColor: "#cff7ba",
+  borderColor: "#417505",
+  borderRadius: "3px",
+  borderWidth: "1px",
   titleColor: "#000000",
   titleFontFamily: "Georgia",
-  titleFontSize: "20px",
-  titleFontWeight: "normal",
+  titleFontSize: "24px",
   titleFontStyle: "normal",
+  titleFontWeight: "normal",
   titleTextDecoration: "none",
   valueColor: "#d0021b",
   valueFontFamily: "Arial",
-  valueFontSize: "35px",
-  valueFontWeight: "bold",
+  valueFontSize: "24px",
   valueFontStyle: "normal",
+  valueFontWeight: "bold",
   valueTextDecoration: "none",
-  backgroundColor: "#b8e986",
-  borderColor: "#417505",
-  borderWidth: "3px",
-  borderRadius: "3px",
 };
 
-// ------------- Styled component for the card with custom settings ------------------
 const StyledCard = styled(Card)(({ theme, settings }) => ({
   background: settings?.backgroundColor || theme.palette.background.paper,
   border: `${settings?.borderWidth || "1px"} solid ${
@@ -53,7 +51,6 @@ const StyledCard = styled(Card)(({ theme, settings }) => ({
   flexDirection: "column",
 }));
 
-// ------------- Styled container for the gauge chart ------------------
 const GaugeContainer = styled(Box)({
   position: "relative",
   width: "100%",
@@ -65,31 +62,20 @@ const GaugeContainer = styled(Box)({
   alignItems: "center",
 });
 
-// ------------- Formats a timestamp into a readable string ------------------
 const formatTimestamp = (timestamp) => {
-  if (!timestamp) return "No timestamp available";
-  const date = new Date(timestamp);
-  const year = date.getUTCFullYear();
-  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(date.getUTCDate()).padStart(2, "0");
-  const hours = String(date.getUTCHours()).padStart(2, "0");
-  const minutes = String(date.getUTCMinutes()).padStart(2, "0");
-  const seconds = String(date.getUTCSeconds()).padStart(2, "0");
-  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+  return timestamp || "No timestamp available";
 };
 
-// ------------- Main component to render a gauge widget on the dashboard ------------------
 const DashboardGaugeWidget = ({ data, width, height }) => {
   const theme = useTheme();
   const settings = { ...customDefaultWidgetSettings, ...(data.settings || {}) };
   const [measurementData, setMeasurementData] = useState({
-    value: 0,
+    value: 0, // Start with 0 or a default value
     timestamp: null,
+    unit: data.unit || "",
   });
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // ------------- Fetches measurement data from the API ------------------
   const fetchMeasurementData = async () => {
     try {
       const { plant, terminal, measurement } = data;
@@ -106,39 +92,56 @@ const DashboardGaugeWidget = ({ data, width, height }) => {
         setMeasurementData({
           value: parseFloat(latestData.MeasurandValue) || 0,
           timestamp: latestData.TimeStamp,
+          unit: latestData.Unit || data.unit || "",
         });
       }
       setError(null);
     } catch (err) {
       console.error("Error fetching measurement data:", err);
       setError("Failed to fetch data");
-    } finally {
-      setLoading(false);
+      // Optionally keep the last value instead of resetting
     }
   };
 
-  // ------------- Fetches data on mount and periodically every 5 seconds ------------------
   useEffect(() => {
-    fetchMeasurementData();
-    const interval = setInterval(fetchMeasurementData, 5000);
+    fetchMeasurementData(); // Initial fetch
+    const interval = setInterval(fetchMeasurementData, 5000); // Poll every 5 seconds for live updates
     return () => clearInterval(interval);
   }, [data.plant, data.terminal, data.measurement]);
 
-  const maxValue = 100;
-  const displayValue = measurementData.value;
+  const minValue = data.minRange || 0;
+  const maxValue = data.maxRange || 100;
+  const displayValue = Math.max(
+    minValue,
+    Math.min(maxValue, measurementData.value)
+  );
+  const range = maxValue - minValue;
+  const gaugeValue = ((displayValue - minValue) / range) * 100;
+
+  const ranges = data.ranges || [
+    { start: minValue, end: minValue + range / 3, color: "#ff5252" },
+    {
+      start: minValue + range / 3,
+      end: minValue + (2 * range) / 3,
+      color: "#ffeb3b",
+    },
+    { start: minValue + (2 * range) / 3, end: maxValue, color: "#4caf50" },
+  ];
+
+  const getGaugeColor = () => {
+    for (const range of ranges) {
+      if (displayValue >= range.start && displayValue <= range.end) {
+        return range.color;
+      }
+    }
+    return settings.gaugeColor || "#1976d2";
+  };
 
   const chartData = {
     datasets: [
       {
-        data: [displayValue, maxValue - displayValue],
-        backgroundColor: [
-          displayValue <= 33
-            ? theme.palette.success.main
-            : displayValue <= 66
-            ? theme.palette.warning.main
-            : theme.palette.error.main,
-          theme.palette.grey[200],
-        ],
+        data: [gaugeValue, 100 - gaugeValue],
+        backgroundColor: [getGaugeColor(), theme.palette.grey[200]],
         borderWidth: 0,
         circumference: 270,
         rotation: 225,
@@ -161,10 +164,10 @@ const DashboardGaugeWidget = ({ data, width, height }) => {
 
   const tooltipTitle = `Last sync: ${formatTimestamp(
     measurementData.timestamp
-  )}`;
+  )}\nMin Range: ${minValue}\nMax Range: ${maxValue}`;
 
   return (
-    <Tooltip title={tooltipTitle} arrow>
+    <Tooltip title={<pre>{tooltipTitle}</pre>} arrow>
       <StyledCard variant="outlined" settings={settings}>
         <CardContent
           sx={{
@@ -183,11 +186,13 @@ const DashboardGaugeWidget = ({ data, width, height }) => {
               fontFamily: settings.titleFontFamily,
               fontStyle: settings.titleFontStyle,
               textDecoration: settings.titleTextDecoration,
+              color: settings.titleColor,
+          
               textAlign: "center",
               mb: 1,
             }}
           >
-            {data.name || "Energy Meter"}
+            {data.name || "Gauge Widget"}
           </Typography>
           <GaugeContainer>
             <Box sx={{ position: "relative", width: "100%", height: "100%" }}>
@@ -211,11 +216,7 @@ const DashboardGaugeWidget = ({ data, width, height }) => {
                   textDecoration: settings.valueTextDecoration,
                 }}
               >
-                {loading
-                  ? "Loading..."
-                  : error
-                  ? "Error"
-                  : displayValue.toFixed(data.decimals || 1)}
+                {error ? "Error" : displayValue.toFixed(data.decimals || 1)}
               </Typography>
               <Typography
                 sx={{
@@ -223,18 +224,18 @@ const DashboardGaugeWidget = ({ data, width, height }) => {
                   bottom: "10%",
                   left: "50%",
                   transform: "translateX(-50%)",
-                  fontSize: "1rem",
-                  color: "text.secondary",
+                  fontWeight: settings.titleFontWeight,
+                  fontSize: settings.titleFontSize,
+                  fontFamily: settings.titleFontFamily,
+                  fontStyle: settings.titleFontStyle,
+                  textDecoration: settings.titleTextDecoration,
+                  color: settings.titleColor,
                 }}
               >
-                {data.unit || "kWh"}
+                {measurementData.unit}
               </Typography>
             </Box>
           </GaugeContainer>
-          <Box sx={{ display: "flex", justifyContent: "space-between", mt: 1 }}>
-            <Typography color="text.secondary">0</Typography>
-            <Typography color="text.secondary">{maxValue}</Typography>
-          </Box>
         </CardContent>
       </StyledCard>
     </Tooltip>

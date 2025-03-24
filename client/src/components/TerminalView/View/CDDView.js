@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import axios from "axios";
 import {
   Box,
@@ -37,11 +37,11 @@ import GraphWidget from "../../Widgets/GraphWidget";
 import WidgetProperties from "../../WidgetProperties";
 import CreateWidgetDialog from "../CreationForm/CreateWidgetDialog";
 import DeleteConfirmationDialog from "../../DeleteConfirmationDialog";
+import SaveIcon from "@mui/icons-material/Save";
+import UpdateIcon from "@mui/icons-material/Update";
 
-// --------------- Base API endpoint from environment variables ---------------
 const BASE_URL = `${process.env.REACT_APP_API_LOCAL_URL}api`;
 
-// --------------- Custom styled Alert for red delete notification ---------------
 const DeleteAlert = styled(Alert)(({ theme }) => ({
   backgroundColor: theme.palette.error.main,
   color: theme.palette.error.contrastText,
@@ -72,12 +72,11 @@ const CDDView = () => {
   const [snackbarSeverity, setSnackbarSeverity] = useState("success");
   const [widgetDialogOpen, setWidgetDialogOpen] = useState(false);
   const [propertiesDialogOpen, setPropertiesDialogOpen] = useState(false);
-  const [setWidgetSettings] = useState(null);
+  const [selectedWidgetId, setSelectedWidgetId] = useState(null);
   const [createdWidgets, setCreatedWidgets] = useState([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [graphData, setGraphData] = useState({});
 
-  // --------------- Fetch initial data (plants and saved views) on mount ---------------
   useEffect(() => {
     axios
       .get(`${BASE_URL}/plants`)
@@ -90,7 +89,6 @@ const CDDView = () => {
       .catch((error) => console.error("Error fetching saved views:", error));
   }, []);
 
-  // --------------- Fetch terminals when plant changes ---------------
   useEffect(() => {
     if (plant) {
       axios
@@ -112,7 +110,6 @@ const CDDView = () => {
     }
   }, [plant]);
 
-  // --------------- Fetch measurands when terminal changes ---------------
   useEffect(() => {
     if (plant && terminal) {
       axios
@@ -125,7 +122,6 @@ const CDDView = () => {
     }
   }, [plant, terminal]);
 
-  // --------------- Memoized function to fetch graph history data ---------------
   const fetchGraphHistory = useCallback(
     async (measurandName) => {
       try {
@@ -144,7 +140,6 @@ const CDDView = () => {
     [plant, terminal]
   );
 
-  // --------------- Memoized function to fetch measurand value ---------------
   const fetchMeasurandValue = useCallback(
     async (measurandName, signal) => {
       try {
@@ -164,12 +159,25 @@ const CDDView = () => {
         return { value: null, timestamp: null };
       }
     },
-    [plant, terminal]
+    [plant, terminal] // Dependencies ensure stability
   );
-
-  // --------------- Fetch graph data every 10 seconds for graph widgets ---------------
+  // Reset state and log mount/unmount
   useEffect(() => {
-    if (!showWidgets || !plant || !terminal || !createdWidgets.length) return;
+    console.log("CDDView mounted");
+    return () => {
+      console.log("CDDView unmounted");
+      setShowWidgets(false);
+      setCreatedWidgets([]);
+      setGraphData({});
+    };
+  }, []);
+
+  // Graph Data Fetching
+  useEffect(() => {
+    if (!showWidgets || !plant || !terminal || !createdWidgets.length) {
+      setGraphData({});
+      return;
+    }
 
     let isMounted = true;
     const controller = new AbortController();
@@ -179,7 +187,7 @@ const CDDView = () => {
         const graphWidgets = createdWidgets.filter(
           (w) => w.widgetType === "graph"
         );
-        const newGraphData = { ...graphData };
+        const newGraphData = {};
 
         await Promise.all(
           graphWidgets.map(async (widget) => {
@@ -198,17 +206,18 @@ const CDDView = () => {
       }
     };
 
-    fetchAllGraphData(); // Initial fetch
-    const interval = setInterval(fetchAllGraphData, 10000); // Fetch every 10 seconds
+    fetchAllGraphData();
+    const interval = setInterval(fetchAllGraphData, 1000);
 
     return () => {
       isMounted = false;
       controller.abort();
       clearInterval(interval);
+      console.log("Graph data fetch effect cleaned up");
     };
-  }, [showWidgets, plant, terminal, fetchGraphHistory]); // Removed createdWidgets and graphData to prevent infinite loop
+  }, [showWidgets, plant, terminal, createdWidgets, fetchGraphHistory]);
 
-  // --------------- Fetch measurand values every 10 seconds for number widgets ---------------
+  // Measurand Value Fetching
   useEffect(() => {
     if (
       !showWidgets ||
@@ -216,8 +225,9 @@ const CDDView = () => {
       !plant ||
       !terminal ||
       !createdWidgets.length
-    )
+    ) {
       return;
+    }
 
     let isMounted = true;
     const controller = new AbortController();
@@ -242,10 +252,24 @@ const CDDView = () => {
         );
 
         if (isMounted) {
-          setCreatedWidgets((prev) => [
-            ...prev.filter((w) => w.widgetType !== "number"),
-            ...updatedWidgets,
-          ]);
+          setCreatedWidgets((prev) => {
+            // Only update if values have changed to prevent re-renders
+            const currentNumberWidgets = prev.filter(
+              (w) => w.widgetType === "number"
+            );
+            const hasChanges = updatedWidgets.some((updated, index) => {
+              const current = currentNumberWidgets[index];
+              return (
+                updated.value !== current.value ||
+                updated.timestamp !== current.timestamp
+              );
+            });
+            if (!hasChanges) return prev; // Avoid re-render if no changes
+            return [
+              ...prev.filter((w) => w.widgetType !== "number"),
+              ...updatedWidgets,
+            ];
+          });
         }
       } catch (error) {
         if (!controller.signal.aborted) {
@@ -254,22 +278,53 @@ const CDDView = () => {
       }
     };
 
-    fetchAllMeasurandValues(); // Initial fetch
-    const interval = setInterval(fetchAllMeasurandValues, 10000); // Fetch every 10 seconds
+    fetchAllMeasurandValues();
+    const interval = setInterval(fetchAllMeasurandValues, 1000);
 
     return () => {
       isMounted = false;
       controller.abort();
       clearInterval(interval);
+      console.log("Measurand value fetch effect cleaned up");
     };
-  }, [showWidgets, showGraph, plant, terminal, fetchMeasurandValue]); // Removed createdWidgets to prevent infinite loop
+  }, [
+    showWidgets,
+    showGraph,
+    plant,
+    terminal,
+    createdWidgets,
+    fetchMeasurandValue,
+  ]);
+  // Memoize NumberWidget props at the top level
+  const numberWidgetPropsMap = useMemo(() => {
+    return layout.reduce((acc, item) => {
+      if (!item.i.includes("-graph")) {
+        const title = item.i.split("-")[0];
+        const widget = createdWidgets.find((w) => w.i === item.i);
+        acc[item.i] = {
+          title,
+          widgetId: item.i,
+          terminalInfo: `${plant} - ${terminal}`,
+          fetchValue: () => fetchMeasurandValue(title), // Stable reference due to useCallback
+          value: widget?.value,
+          timestamp: widget?.timestamp,
+          onDelete: (id) => {
+            setLayout((prev) => prev.filter((l) => l.i !== id));
+            setCreatedWidgets((prev) => prev.filter((w) => w.i !== id));
+            setMeasurands((prev) => prev.filter((m) => m !== title));
+          },
+          onOpenProperties: () => handleOpenProperties(item.i),
+          ...widget?.properties,
+        };
+      }
+      return acc;
+    }, {});
+  }, [layout, createdWidgets, plant, terminal, fetchMeasurandValue]);
 
-  // --------------- Check if all measurands are selected ---------------
   const allSelected =
     measurands.length === availableMeasurands.length &&
     availableMeasurands.length > 0;
 
-  // --------------- Handle measurand selection with "Select All" option ---------------
   const handleMeasurandChange = (event) => {
     const value = event.target.value;
     if (value.includes("selectAll")) {
@@ -281,14 +336,19 @@ const CDDView = () => {
     }
   };
 
-  // --------------- Generate widgets when "Go" is clicked ---------------
+  const showSnackbar = (message, severity) => {
+    setSnackbarMessage(message);
+    setSnackbarSeverity(severity);
+    setSnackbarOpen(false);
+    setTimeout(() => setSnackbarOpen(true), 100);
+  };
+
   const handleGoClick = () => {
     if (!plant || !terminal || !measurands.length) {
-      setSnackbarMessage(
-        "Please select a plant, terminal, and at least one measurand"
+      showSnackbar(
+        "Please select a plant, terminal, and at least one measurand",
+        "warning"
       );
-      setSnackbarSeverity("warning");
-      setSnackbarOpen(true);
       return;
     }
 
@@ -310,13 +370,13 @@ const CDDView = () => {
         decimalPlaces: 2,
         graphType: showGraph ? "area" : null,
         xAxisConfiguration: showGraph ? "time:timestamp" : null,
-        refreshInterval: 10000,
+        refreshInterval: 1000,
         properties: {},
         position: {
-          x: (index % 3) * 4,
-          y: Math.floor(index / 3) * 4,
-          width: showGraph ? 6 : 4,
-          height: showGraph ? 6 : 4,
+          x: (index % 6) * 2,
+          y: Math.floor(index / 6) * 2,
+          width: showGraph ? 4 : 2,
+          height: showGraph ? 6 : 3,
         },
         i: `${measurand}${showGraph ? "-graph" : ""}`,
       };
@@ -330,10 +390,11 @@ const CDDView = () => {
         y: w.position.y,
         w: w.position.width,
         h: w.position.height,
-        minW: showGraph ? 4 : 2,
-        minH: showGraph ? 4 : 2,
+        minW: 1,
+        minH: 3,
         maxW: 12,
         maxH: 8,
+        resizeHandles: ["se"],
       }))
     );
     setSelectionInfo({
@@ -344,10 +405,8 @@ const CDDView = () => {
       timestamp: new Date().toLocaleString(),
     });
     setShowWidgets(true);
-    setSelectedView("");
   };
 
-  // --------------- Update widget positions when layout changes ---------------
   const onLayoutChange = (newLayout) => {
     const adjustedLayout = newLayout.map((item) => ({
       ...item,
@@ -375,12 +434,10 @@ const CDDView = () => {
     );
   };
 
-  // --------------- Open save view dialog ---------------
   const handleSaveView = () => {
     setSaveDialogOpen(true);
   };
 
-  // --------------- Validate view name for uniqueness and emptiness ---------------
   const validateViewName = (name) => {
     if (!name.trim()) {
       return "View name cannot be empty";
@@ -395,36 +452,38 @@ const CDDView = () => {
     return "";
   };
 
-  // --------------- Handle view name input change with validation ---------------
   const handleViewNameChange = (e) => {
     const name = e.target.value;
     setViewName(name);
     setViewNameError(validateViewName(name));
   };
 
-  // --------------- Save view ---------------
   const handleSaveViewConfirm = async () => {
     const nameError = validateViewName(viewName);
     if (nameError) {
       setViewNameError(nameError);
-      setSnackbarMessage(nameError);
-      setSnackbarSeverity("error");
-      setSnackbarOpen(true);
+      showSnackbar(nameError, "error");
       return;
     }
 
     try {
       if (createdWidgets.length === 0) {
-        setSnackbarMessage("No widgets to save in this view");
-        setSnackbarSeverity("warning");
-        setSnackbarOpen(true);
+        showSnackbar("No widgets to save in this view", "warning");
         return;
       }
 
       const viewData = {
         name: viewName,
         description: viewDescription,
-        widgets: createdWidgets,
+        widgets: createdWidgets.map((widget) => ({
+          ...widget,
+          position: {
+            x: widget.position.x,
+            y: widget.position.y,
+            width: widget.position.width,
+            height: widget.position.height,
+          },
+        })),
         plant,
         terminal,
       };
@@ -432,23 +491,57 @@ const CDDView = () => {
       const response = await axios.post(`${BASE_URL}/saved-views`, viewData);
       setSavedViews((prev) => [...prev, response.data]);
 
-      setSnackbarMessage(`View "${viewName}" saved successfully!`);
-      setSnackbarSeverity("success");
-      setSnackbarOpen(true);
       setSaveDialogOpen(false);
       setViewName("");
       setViewDescription("");
       setViewNameError("");
+      showSnackbar("View saved successfully", "success");
     } catch (error) {
-      console.error("Error saving view:", error);
+      console.error("Error saving view:", error.response?.data || error);
       const errorMessage = error.response?.data?.message || "Error saving view";
-      setSnackbarMessage(errorMessage);
-      setSnackbarSeverity("error");
-      setSnackbarOpen(true);
+      showSnackbar(errorMessage, "error");
     }
   };
 
-  // --------------- Load a saved view ---------------
+  const handleUpdateView = async () => {
+    if (!selectedView) return;
+
+    try {
+      const viewData = {
+        name: savedViews.find((v) => v._id === selectedView).name,
+        description:
+          viewDescription ||
+          savedViews.find((v) => v._id === selectedView).description ||
+          "",
+        widgets: createdWidgets.map((widget) => ({
+          ...widget,
+          position: {
+            x: widget.position.x,
+            y: widget.position.y,
+            width: widget.position.width,
+            height: widget.position.height,
+          },
+        })),
+        plant,
+        terminal,
+      };
+
+      const response = await axios.put(
+        `${BASE_URL}/saved-views/${selectedView}`,
+        viewData
+      );
+      setSavedViews((prev) =>
+        prev.map((v) => (v._id === selectedView ? response.data : v))
+      );
+      showSnackbar("View updated successfully", "success");
+    } catch (error) {
+      console.error("Error updating view:", error.response?.data || error);
+      const errorMessage =
+        error.response?.data?.message || "Error updating view";
+      showSnackbar(errorMessage, "error");
+    }
+  };
+
   const handleViewChange = async (event) => {
     const viewId = event.target.value;
     setSelectedView(viewId);
@@ -466,12 +559,13 @@ const CDDView = () => {
               }`,
               x: w.position?.x ?? 0,
               y: w.position?.y ?? 0,
-              w: w.position?.width ?? (w.widgetType === "graph" ? 6 : 4),
-              h: w.position?.height ?? (w.widgetType === "graph" ? 6 : 4),
-              minW: w.widgetType === "graph" ? 4 : 2,
-              minH: w.widgetType === "graph" ? 4 : 2,
+              w: w.position?.width ?? (w.widgetType === "graph" ? 2 : 2),
+              h: w.position?.height ?? (w.widgetType === "graph" ? 2 : 2),
+              minW: 2,
+              minH: 2,
               maxW: 12,
               maxH: 8,
+              resizeHandles: ["se"],
             }))
           );
           setMeasurands(savedView.widgets.map((w) => w.measurandName));
@@ -491,9 +585,7 @@ const CDDView = () => {
         }
       } catch (error) {
         console.error("Error loading saved view:", error);
-        setSnackbarMessage("Error loading saved view");
-        setSnackbarSeverity("error");
-        setSnackbarOpen(true);
+        showSnackbar("Error loading saved view", "error");
       }
     } else {
       setShowWidgets(false);
@@ -503,13 +595,11 @@ const CDDView = () => {
     }
   };
 
-  // --------------- Open delete confirmation dialog ---------------
   const handleDeleteClick = () => {
     if (!selectedView) return;
     setDeleteDialogOpen(true);
   };
 
-  // --------------- Handle view deletion with confirmation ---------------
   const handleDeleteView = async () => {
     try {
       await axios.delete(`${BASE_URL}/saved-views/${selectedView}`);
@@ -518,41 +608,30 @@ const CDDView = () => {
       setShowWidgets(false);
       setCreatedWidgets([]);
       setSelectionInfo(null);
-      setSnackbarMessage("View deleted successfully");
-      setSnackbarSeverity("error");
-      setSnackbarOpen(true);
+      showSnackbar("View deleted successfully", "error");
     } catch (error) {
       console.error("Error deleting view:", error);
-      setSnackbarMessage("Error deleting view");
-      setSnackbarSeverity("error");
-      setSnackbarOpen(true);
+      showSnackbar("Error deleting view", "error");
     } finally {
       setDeleteDialogOpen(false);
     }
   };
 
-  // --------------- Close delete confirmation dialog ---------------
   const handleDeleteDialogClose = () => {
     setDeleteDialogOpen(false);
   };
 
-  // --------------- Open add widget dialog ---------------
   const handleAddWidget = () => {
     if (!plant || !terminal) {
-      setSnackbarMessage("Please select a plant and terminal first");
-      setSnackbarSeverity("warning");
-      setSnackbarOpen(true);
+      showSnackbar("Please select a plant and terminal first", "warning");
       return;
     }
     setWidgetDialogOpen(true);
   };
 
-  // --------------- Create a new widget ---------------
   const handleCreateWidget = async (widgetData) => {
     if (widgetData.error) {
-      setSnackbarMessage(widgetData.error);
-      setSnackbarSeverity("warning");
-      setSnackbarOpen(true);
+      showSnackbar(widgetData.error, "warning");
       return;
     }
 
@@ -576,13 +655,13 @@ const CDDView = () => {
       xAxisConfiguration: widgetData.isGraph
         ? { type: "time", value: "timestamp" }
         : null,
-      refreshInterval: 10000,
+      refreshInterval: 1000,
       properties: {},
       position: {
-        x: 0,
-        y: layout.length ? Math.max(...layout.map((l) => l.y + l.h)) : 0,
-        width: widgetData.isGraph ? 6 : 4,
-        height: widgetData.isGraph ? 6 : 4,
+        x: (layout.length % 6) * 2,
+        y: Math.floor(layout.length / 6) * 2,
+        width: widgetData.isGraph ? 4 : 2,
+        height: widgetData.isGraph ? 6 : 3,
       },
       i: `${widgetData.mesrand}${widgetData.isGraph ? "-graph" : ""}`,
     };
@@ -596,42 +675,67 @@ const CDDView = () => {
         y: newWidget.position.y,
         w: newWidget.position.width,
         h: newWidget.position.height,
-        minW: widgetData.isGraph ? 4 : 2,
-        minH: widgetData.isGraph ? 4 : 2,
+        minW: 2,
+        minH: 2,
         maxW: 12,
         maxH: 8,
+        resizeHandles: ["se"],
       },
     ]);
+    setMeasurands((prev) => [...prev, widgetData.mesrand]);
     setShowWidgets(true);
-    setSnackbarMessage("Widget created successfully!");
-    setSnackbarSeverity("success");
-    setSnackbarOpen(true);
+    showSnackbar("Widget created successfully!", "success");
     setWidgetDialogOpen(false);
   };
 
-  // --------------- Open widget properties dialog ---------------
-  const handleOpenProperties = () => {
+  const handleOpenProperties = (widgetId) => {
+    setSelectedWidgetId(widgetId);
     setPropertiesDialogOpen(true);
   };
 
-  // --------------- Apply widget settings ---------------
-  const handleApplySettings = (settings) => {
-    setWidgetSettings(settings);
-    const lastWidget = layout[layout.length - 1];
-    if (lastWidget) {
-      setCreatedWidgets((prev) =>
-        prev.map((w) =>
-          w.i === lastWidget.i ? { ...w, properties: settings } : w
-        )
-      );
-    }
+  const handleCloseProperties = () => {
     setPropertiesDialogOpen(false);
-    setSnackbarMessage("Widget properties applied!");
-    setSnackbarSeverity("success");
-    setSnackbarOpen(true);
+    setSelectedWidgetId(null);
   };
 
-  // --------------- Animation transition for Snackbar ---------------
+  const handleApplySettings = (settings, applyToAll) => {
+    setCreatedWidgets((prev) => {
+      const updatedWidgets = applyToAll
+        ? prev.map((w) => ({
+            ...w,
+            properties: { ...w.properties, ...settings },
+          }))
+        : prev.map((w) =>
+            w.i === selectedWidgetId
+              ? {
+                  ...w,
+                  properties: { ...w.properties, ...settings },
+                }
+              : w
+          );
+
+      updatedWidgets.forEach((w) => {
+        if (applyToAll || w.i === selectedWidgetId) {
+          localStorage.setItem(
+            `widgetSettings_${w.i}`,
+            JSON.stringify(w.properties)
+          );
+        }
+      });
+
+      return updatedWidgets;
+    });
+
+    showSnackbar(
+      applyToAll
+        ? "Properties applied to all widgets successfully!"
+        : "Widget properties updated successfully!",
+      "success"
+    );
+    setPropertiesDialogOpen(false);
+    setSelectedWidgetId(null);
+  };
+
   const TransitionSlide = (props) => {
     return <Slide {...props} direction="left" />;
   };
@@ -639,12 +743,7 @@ const CDDView = () => {
   return (
     <Box sx={{ width: "100%", p: 2 }}>
       <Paper sx={{ p: 2 }}>
-        <Box
-          sx={{
-            display: "flex",
-            gap: 2,
-          }}
-        >
+        <Box sx={{ display: "flex", gap: 2 }}>
           <FormControl size="small" sx={{ minWidth: 200 }}>
             <InputLabel>Plant</InputLabel>
             <Select
@@ -733,16 +832,6 @@ const CDDView = () => {
             Add Widget
           </Button>
 
-          {showWidgets && (
-            <Button
-              variant="outlined"
-              onClick={handleSaveView}
-              sx={{ flexShrink: 0, ml: 1 }}
-            >
-              Save View
-            </Button>
-          )}
-
           <FormControl size="small" sx={{ minWidth: 200 }}>
             <InputLabel>Saved Views</InputLabel>
             <Select
@@ -761,13 +850,33 @@ const CDDView = () => {
             </Select>
           </FormControl>
 
+          {showWidgets && (
+            <Tooltip title="Save View">
+              <IconButton
+                variant="outlined"
+                onClick={handleSaveView}
+                color="primary"
+              >
+                <SaveIcon />
+              </IconButton>
+            </Tooltip>
+          )}
+
+          {showWidgets && selectedView && (
+            <Tooltip title="Update View">
+              <IconButton
+                variant="outlined"
+                onClick={handleUpdateView}
+                color="primary"
+              >
+                <UpdateIcon />
+              </IconButton>
+            </Tooltip>
+          )}
+
           {selectedView && (
             <Tooltip title="Delete Selected View">
-              <IconButton
-                color="error"
-                onClick={handleDeleteClick}
-                sx={{ ml: 1, flexShrink: 0 }}
-              >
+              <IconButton color="error" onClick={handleDeleteClick}>
                 <DeleteIcon />
               </IconButton>
             </Tooltip>
@@ -775,7 +884,6 @@ const CDDView = () => {
         </Box>
       </Paper>
 
-      {/* --------------- Selection info display ------------ */}
       {selectionInfo && (
         <Paper sx={{ p: 2, mb: 1, mt: 1 }}>
           <Box
@@ -833,7 +941,6 @@ const CDDView = () => {
         </Paper>
       )}
 
-      {/* --------------- Widget grid layout ------------ */}
       {showWidgets ? (
         <Paper elevation={3} sx={{ p: 2 }}>
           <GridLayout
@@ -852,7 +959,7 @@ const CDDView = () => {
             {layout.map((item) => {
               const isGraph = item.i.includes("-graph");
               const title = item.i.split("-")[0];
-              const widget = createdWidgets.find((w) => w.i === item.i);
+
               return (
                 <div key={item.i}>
                   {isGraph ? (
@@ -866,25 +973,15 @@ const CDDView = () => {
                         setCreatedWidgets((prev) =>
                           prev.filter((w) => w.i !== id)
                         );
-                      }}
-                      availableMeasurands={availableMeasurands}
-                    />
-                  ) : (
-                    <NumberWidget
-                      title={title}
-                      widgetId={item.i}
-                      terminalInfo={`${plant} - ${terminal}`}
-                      fetchValue={() => fetchMeasurandValue(title)}
-                      value={widget?.value}
-                      timestamp={widget?.timestamp}
-                      onDelete={(id) => {
-                        setLayout((prev) => prev.filter((l) => l.i !== id));
-                        setCreatedWidgets((prev) =>
-                          prev.filter((w) => w.i !== id)
+                        setMeasurands((prev) =>
+                          prev.filter((m) => m !== title)
                         );
                       }}
-                      {...(widget?.properties || {})}
+                      availableMeasurands={availableMeasurands}
+                      onOpenProperties={() => handleOpenProperties(item.i)}
                     />
+                  ) : (
+                    <NumberWidget {...numberWidgetPropsMap[item.i]} />
                   )}
                 </div>
               );
@@ -902,7 +999,6 @@ const CDDView = () => {
         </Typography>
       )}
 
-      {/* --------------- Save view dialog ------------ */}
       <Dialog open={saveDialogOpen} onClose={() => setSaveDialogOpen(false)}>
         <DialogTitle>Save View</DialogTitle>
         <DialogContent>
@@ -950,7 +1046,6 @@ const CDDView = () => {
         </DialogActions>
       </Dialog>
 
-      {/* --------------- Add widget dialog ------------ */}
       <CreateWidgetDialog
         open={widgetDialogOpen}
         onClose={() => setWidgetDialogOpen(false)}
@@ -959,10 +1054,9 @@ const CDDView = () => {
         availableMeasurands={availableMeasurands}
       />
 
-      {/* --------------- Widget properties dialog ------------ */}
       <Dialog
         open={propertiesDialogOpen}
-        onClose={() => setPropertiesDialogOpen(false)}
+        onClose={handleCloseProperties}
         maxWidth="lg"
         fullWidth
       >
@@ -970,16 +1064,16 @@ const CDDView = () => {
         <DialogContent>
           <WidgetProperties
             onApply={handleApplySettings}
-            selectedWidget={createdWidgets[createdWidgets.length - 1]?.i}
+            selectedWidget={selectedWidgetId}
             viewId={selectedView}
+            onClose={handleCloseProperties}
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setPropertiesDialogOpen(false)}>Close</Button>
+          <Button onClick={handleCloseProperties}>Close</Button>
         </DialogActions>
       </Dialog>
 
-      {/* --------------- Delete confirmation dialog ------------ */}
       <DeleteConfirmationDialog
         open={deleteDialogOpen}
         onClose={handleDeleteDialogClose}
@@ -995,6 +1089,7 @@ const CDDView = () => {
       />
 
       <Snackbar
+        key={snackbarMessage}
         open={snackbarOpen}
         autoHideDuration={6000}
         onClose={() => setSnackbarOpen(false)}
