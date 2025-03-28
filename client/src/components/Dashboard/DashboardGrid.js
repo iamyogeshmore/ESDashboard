@@ -22,13 +22,10 @@ const DashboardGrid = ({
   dashboardName,
   isPublished,
 }) => {
-  // ------------- Renders an individual widget based on its type -------------
   const renderWidget = (widget) => {
-    // Calculate pixel dimensions based on grid units
     const pixelWidth = widget.layout.w * ((window.innerWidth - 48) / 12);
     const pixelHeight = widget.layout.h * 50;
 
-    // Enhance widget data with default empty arrays if properties are missing
     const enhancedData = {
       ...widget,
       plants: widget.plants || [],
@@ -42,12 +39,11 @@ const DashboardGrid = ({
           position: "relative",
           height: "100%",
           "&:hover .delete-icon, &:hover .settings-icon": {
-            opacity: !isPublished ? 1 : 0, // Show icons only when not published
+            opacity: !isPublished ? 1 : 0,
           },
         }}
       >
         {(() => {
-          // Switch statement to render appropriate widget component
           switch (widget.type) {
             case "number":
               return (
@@ -106,7 +102,6 @@ const DashboardGrid = ({
           }
         })()}
 
-        {/* Render delete and settings buttons only if dashboard isn't published */}
         {!isPublished && (
           <>
             <IconButton
@@ -144,7 +139,7 @@ const DashboardGrid = ({
                 "&:hover": { backgroundColor: "rgba(33, 150, 243, 0.8)" },
                 "& .MuiSvgIcon-root": { fontSize: "1rem" },
               }}
-              onClick={() => handleSettingsClick(widget.id)}
+              onClick={() => handleSettingsClick(widget.id, widget)}
             >
               <SettingsIcon />
             </IconButton>
@@ -154,7 +149,6 @@ const DashboardGrid = ({
     );
   };
 
-  // ------------- Renders the grid layout with all widgets -------------
   return (
     <GridLayout
       className="layout"
@@ -163,8 +157,8 @@ const DashboardGrid = ({
       rowHeight={50}
       width={window.innerWidth - 48}
       onLayoutChange={onLayoutChange}
-      isResizable={true}
-      isDraggable={true}
+      isResizable={!isPublished} // Explicitly disable resizing in published mode
+      isDraggable={!isPublished} // Explicitly disable dragging in published mode
       compactType="vertical"
       preventCollision={false}
     >

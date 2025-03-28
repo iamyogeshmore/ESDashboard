@@ -21,6 +21,7 @@ import {
   Publish as PublishIcon,
 } from "@mui/icons-material";
 
+// --------------------------- Function renders the dashboard toolbar with widget controls -------------------------------
 const DashboardToolbar = ({
   dashboardName,
   isPublished,

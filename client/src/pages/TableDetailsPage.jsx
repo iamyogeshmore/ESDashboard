@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useContext } from "react";
-import axios from "axios";
 import { useParams, useNavigate } from "react-router-dom";
+import axios from "axios";
 import {
   AppBar,
   Toolbar,
@@ -37,10 +37,28 @@ import "../styles/TableDetailsPage.css";
 import { ThemeContext } from "../contexts/ThemeContext";
 import GraphComponent from "../components/Widgets/HDDGraph";
 
-// --------------- Base API endpoint from environment variables ---------------
+// Base API endpoint from environment variables
 const BASE_URL = `${process.env.REACT_APP_API_LOCAL_URL}api/hdd`;
 
-// ---------------- Styled component for displaying value differences -----------------
+const formatTimestamp = (timestamp) => {
+  if (!timestamp) return "No timestamp available";
+  const date = new Date(timestamp);
+  return date.toLocaleString("en-US", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false, 
+    timeZone: "UTC",
+  });
+};
+
+// In-memory cache
+const historicalCache = {};
+
+// Styled components
 const DifferenceBox = styled(Box)(({ theme, isNegative, isZero }) => ({
   display: "flex",
   alignItems: "center",
@@ -50,7 +68,6 @@ const DifferenceBox = styled(Box)(({ theme, isNegative, isZero }) => ({
   borderRadius: "4px",
 }));
 
-// ---------------- Styled component for menu items in the measurand selector -----------------
 const StyledMenuItem = styled(MenuItem)(({ theme, isSelected }) => ({
   backgroundColor: isSelected
     ? theme.palette.mode === "dark"
@@ -71,7 +88,6 @@ const StyledMenuItem = styled(MenuItem)(({ theme, isSelected }) => ({
   },
 }));
 
-// ---------------- Styled component for paper containers -----------------
 const StyledPaper = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(3),
   borderRadius: "16px",
@@ -83,7 +99,6 @@ const StyledPaper = styled(Paper)(({ theme }) => ({
   color: theme.palette.text.primary,
 }));
 
-// ---------------- Styled component for the app bar -----------------
 const StyledAppBar = styled(AppBar)(({ theme }) => ({
   background:
     theme.palette.mode === "dark"
@@ -92,7 +107,6 @@ const StyledAppBar = styled(AppBar)(({ theme }) => ({
   boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
 }));
 
-// ---------------- Styled component for buttons -----------------
 const StyledButton = styled(Button)(({ theme }) => ({
   borderRadius: "8px",
   padding: theme.spacing(1, 3),
@@ -110,7 +124,6 @@ const StyledButton = styled(Button)(({ theme }) => ({
   },
 }));
 
-// ---------------- Styled component for the data grid -----------------
 const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
   "& .MuiDataGrid-root": {
     border: "none",
@@ -133,7 +146,6 @@ const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
   },
 }));
 
-// ---------------- Styled component for export buttons -----------------
 const ExportButton = styled(IconButton)(({ theme }) => ({
   background:
     theme.palette.mode === "dark"
@@ -151,7 +163,6 @@ const ExportButton = styled(IconButton)(({ theme }) => ({
   },
 }));
 
-// ---------------- Styled component for analysis cards -----------------
 const AnalysisCard = styled(Box)(({ theme }) => ({
   padding: "16px",
   borderRadius: "12px",
@@ -162,7 +173,6 @@ const AnalysisCard = styled(Box)(({ theme }) => ({
   boxShadow: "0 4px 15px rgba(0,0,0,0.1)",
 }));
 
-// ---------------- Styled component for snackbar notifications -----------------
 const StyledSnackbar = muiStyled(Snackbar)(({ theme }) => ({
   "& .MuiSnackbarContent-root": {
     background:
@@ -176,7 +186,6 @@ const StyledSnackbar = muiStyled(Snackbar)(({ theme }) => ({
   },
 }));
 
-// ---------------- Styled component for alerts within snackbar -----------------
 const StyledAlert = muiStyled(MuiAlert)(({ theme, severity }) => ({
   background: "transparent",
   color: theme.palette.text.primary,
@@ -199,6 +208,7 @@ const TableDetailsPage = () => {
   const [loading, setLoading] = useState(false);
   const [gridLoading, setGridLoading] = useState(true);
   const [measurandOptions, setMeasurandOptions] = useState([]);
+  const [measurandIds, setMeasurandIds] = useState([]);
   const [availableMeasurands, setAvailableMeasurands] = useState([]);
   const [newMeasurand, setNewMeasurand] = useState("");
   const [selectedRows, setSelectedRows] = useState([]);
@@ -213,9 +223,12 @@ const TableDetailsPage = () => {
     measurand: null,
   });
 
-  // ---------------- Default date filter setup -----------------
-  const defaultStart = "2025-01-01T00:00";
-  const defaultEnd = new Date().toISOString().slice(0, 16);
+  // Default to last 1 hour
+  const now = new Date();
+  const defaultStart = new Date(now.getTime() - 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 16);
+  const defaultEnd = now.toISOString().slice(0, 16);
   const [dateFilter, setDateFilter] = useState({
     start: defaultStart,
     end: defaultEnd,
@@ -223,199 +236,205 @@ const TableDetailsPage = () => {
 
   const [measurandData, setMeasurandData] = useState({});
 
-  // ---------------- Transition component for snackbar -----------------
-  const TransitionLeft = (props) => {
-    return <Slide {...props} direction="left" />;
-  };
+  const TransitionLeft = (props) => <Slide {...props} direction="left" />;
 
-  // ---------------- Shows a snackbar notification -----------------
   const showSnackbar = (message, severity = "info", loading = false) => {
-    setSnackbar({
-      open: true,
-      message,
-      severity,
-      loading,
-    });
+    setSnackbar({ open: true, message, severity, loading });
   };
 
-  // ---------------- Hides the snackbar -----------------
   const hideSnackbar = () => {
     setSnackbar((prev) => ({ ...prev, open: false, loading: false }));
   };
 
-  // ---------------- Handles snackbar close events -----------------
   const handleSnackbarClose = (event, reason) => {
     if (reason === "clickaway") return;
     hideSnackbar();
   };
 
-  // ---------------- Fetches initial table data -----------------
-  const fetchTableData = useCallback(() => {
+  const fetchTableData = useCallback(async () => {
     setLoading(true);
     setGridLoading(true);
     showSnackbar("Fetching table data", "info", true);
 
-    axios
-      .get(`${BASE_URL}/`)
-      .then((response) => {
-        const foundTable = response.data.find((t) => t._id === tableId);
-        if (foundTable) {
-          setTable(foundTable);
-          setMeasurandOptions(foundTable.measurandNames || []);
-          showSnackbar("Table data loaded successfully", "success");
-        } else {
-          showSnackbar("Table not found", "error");
-        }
-        setLoading(false);
-        setGridLoading(false);
-      })
-      .catch((error) => {
-        console.error("Error fetching table:", error);
-        showSnackbar("Failed to load table data", "error");
-        setLoading(false);
-        setGridLoading(false);
-      });
+    try {
+      const response = await axios.get(`${BASE_URL}/`);
+      if (!response.data.success) throw new Error(response.data.message);
+      const foundTable = response.data.data.find((t) => t._id === tableId);
+      if (foundTable) {
+        setTable({
+          ...foundTable,
+          plantId: foundTable.plantId,
+          terminalId: foundTable.terminalId,
+          plantName: foundTable.plantName || "Unknown",
+          terminalName: foundTable.terminalName || "Unknown",
+        });
+        setMeasurandOptions(foundTable.measurandNames || []);
+        setMeasurandIds(foundTable.measurandIds || []);
+        showSnackbar("Table data loaded successfully", "success");
+      } else {
+        throw new Error("Table not found");
+      }
+    } catch (error) {
+      console.error("Error fetching table:", error);
+      showSnackbar(error.message || "Failed to load table data", "error");
+    } finally {
+      setLoading(false);
+      setGridLoading(false);
+    }
   }, [tableId]);
 
-  // ---------------- Fetches available measurands -----------------
-  const fetchAvailableMeasurands = useCallback(() => {
-    if (!table?.plantName || !table?.terminalName) return;
+  const fetchAvailableMeasurands = useCallback(async () => {
+    if (!table?.plantId || !table?.terminalId) return;
     showSnackbar("Fetching available measurands", "info", true);
-    axios
-      .get(`${BASE_URL}/measurands/${table.plantName}/${table.terminalName}`)
-      .then((response) => {
-        setAvailableMeasurands(response.data);
-        showSnackbar("Measurands loaded successfully", "success");
-      })
-      .catch((error) => {
-        console.error("Error fetching available measurands:", error);
-        showSnackbar("Failed to load measurands", "error");
-      });
+
+    try {
+      const response = await axios.get(
+        `${BASE_URL}/measurands/${table.plantId}/${table.terminalId}`
+      );
+      if (!response.data.success) throw new Error(response.data.message);
+      setAvailableMeasurands(response.data.data); // Now gets all measurands
+      showSnackbar("Measurands loaded successfully", "success");
+    } catch (error) {
+      console.error("Error fetching available measurands:", error);
+      showSnackbar(error.message || "Failed to load measurands", "error");
+    }
   }, [table]);
 
-  // ---------------- Fetches historical measurand data -----------------
-  const fetchMeasurandData = useCallback(() => {
-    if (!table?.measurandNames?.length) return;
+  const fetchHistoricalMeasurandValues = useCallback(async () => {
+    if (!table?.terminalId || !measurandIds.length) return;
     setGridLoading(true);
-    showSnackbar("Fetching measurand data", "info", true);
+    showSnackbar("Fetching historical measurand data", "info", true);
 
-    const promises = table.measurandNames.map((measurand) =>
-      axios
-        .get(
-          `${BASE_URL}/historical/${table.plantName}/${table.terminalName}/${measurand}`,
-          {
-            params: {
-              from: dateFilter.start,
-              to: dateFilter.end,
-            },
-          }
-        )
-        .then((res) => {
-          const transformedData = res.data.data.map((item) => ({
-            timestamp: item.Timestamp,
-            value: item.MeasurandValue,
-          }));
-          return { measurand, data: transformedData };
-        })
-        .catch((error) => {
-          console.error(`Error fetching ${measurand}:`, error);
-          showSnackbar(`Failed to load ${measurand} data`, "error");
-          return { measurand, data: [] };
-        })
-    );
+    const fetchDataForMeasurand = async (measurandId, measurandName) => {
+      const cacheKey = `${table.terminalId}:${measurandId}:${dateFilter.start}:${dateFilter.end}`;
+      if (historicalCache[cacheKey]) {
+        console.log(`Cache hit for ${cacheKey}`);
+        return { measurandName, data: historicalCache[cacheKey] };
+      }
 
-    Promise.all(promises)
-      .then((results) => {
-        const newData = {};
-        results.forEach(({ measurand, data }) => {
-          newData[measurand] = data;
-        });
-        setMeasurandData(newData);
-        setGridLoading(false);
-        showSnackbar("Measurand data loaded successfully", "success");
-      })
-      .catch((error) => {
-        console.error("Error in Promise.all:", error);
-        setGridLoading(false);
-        showSnackbar("Failed to load measurand data", "error");
+      try {
+        const response = await axios.get(
+          `${BASE_URL}/historical/${table.terminalId}/${measurandId}?from=${dateFilter.start}&to=${dateFilter.end}`
+        );
+        if (!response.data.success) throw new Error(response.data.message);
+        const result = response.data.data.map((item) => ({
+          timestamp: item.Timestamp,
+          value: item.MeasurandValue,
+          name: item.MeasurandName,
+        }));
+        historicalCache[cacheKey] = result;
+        return { measurandName, data: result };
+      } catch (error) {
+        console.error(`Error fetching ${measurandName}:`, error);
+        showSnackbar(
+          error.message || `Failed to load ${measurandName} data`,
+          "error"
+        );
+        return { measurandName, data: [] };
+      }
+    };
+
+    try {
+      const promises = measurandIds.map((id, idx) =>
+        fetchDataForMeasurand(id, measurandOptions[idx])
+      );
+      const results = await Promise.all(promises);
+      const newData = {};
+      results.forEach(({ measurandName, data }) => {
+        newData[measurandName] = data;
       });
-  }, [table, dateFilter]);
+      setMeasurandData(newData);
+      showSnackbar("Historical measurand data loaded successfully", "success");
+    } catch (error) {
+      console.error("Error in fetching historical data:", error);
+      showSnackbar("Failed to load historical measurand data", "error");
+    } finally {
+      setGridLoading(false);
+    }
+  }, [table, dateFilter, measurandIds, measurandOptions]);
 
-  // ---------------- Effect to fetch table data on mount or tableId change -----------------
   useEffect(() => {
     fetchTableData();
-  }, [tableId, fetchTableData]);
+  }, [fetchTableData]);
 
-  // ---------------- Effect to fetch measurand data when table or date filter changes -----------------
-  useEffect(() => {
-    if (table) {
-      fetchMeasurandData();
-    }
-  }, [table, dateFilter, fetchMeasurandData]);
-
-  // ---------------- Effect to fetch available measurands when table changes -----------------
   useEffect(() => {
     if (table) {
       fetchAvailableMeasurands();
+      fetchHistoricalMeasurandValues();
     }
-  }, [table, fetchAvailableMeasurands]);
+  }, [
+    table,
+    dateFilter,
+    fetchAvailableMeasurands,
+    fetchHistoricalMeasurandValues,
+  ]);
 
-  // ---------------- Handles adding a new measurand -----------------
-  const handleMeasurandChange = (event) => {
-    const selectedMeasurand = event.target.value;
+  const handleMeasurandChange = async (event) => {
+    const selectedMeasurandName = event.target.value;
+    const selectedMeasurand = availableMeasurands.find(
+      (m) => m.measurandName === selectedMeasurandName
+    );
     if (
       selectedMeasurand &&
-      !measurandOptions.includes(selectedMeasurand) &&
-      availableMeasurands.includes(selectedMeasurand)
+      !measurandOptions.includes(selectedMeasurandName)
     ) {
-      showSnackbar(`Adding ${selectedMeasurand}`, "info", true);
-      setMeasurandOptions([...measurandOptions, selectedMeasurand]);
+      showSnackbar(`Adding ${selectedMeasurandName}`, "info", true);
+      const updatedOptions = [...measurandOptions, selectedMeasurandName];
+      const updatedIds = [...measurandIds, selectedMeasurand.measurandId];
+      setMeasurandOptions(updatedOptions);
+      setMeasurandIds(updatedIds);
       setNewMeasurand("");
-      axios
-        .get(
-          `${BASE_URL}/historical/${table.plantName}/${table.terminalName}/${selectedMeasurand}`,
-          {
-            params: {
-              from: dateFilter.start,
-              to: dateFilter.end,
-            },
-          }
-        )
-        .then((res) => {
-          const transformedData = res.data.data.map((item) => ({
-            timestamp: item.Timestamp,
-            value: item.MeasurandValue,
-          }));
-          setMeasurandData((prev) => ({
-            ...prev,
-            [selectedMeasurand]: transformedData,
-          }));
-          showSnackbar(`${selectedMeasurand} added successfully`, "success");
-        })
-        .catch((error) => {
-          console.error("Error fetching new measurand values:", error);
-          showSnackbar(`Failed to add ${selectedMeasurand}`, "error");
-        });
+
+      const cacheKey = `${table.terminalId}:${selectedMeasurand.measurandId}:${dateFilter.start}:${dateFilter.end}`;
+      if (historicalCache[cacheKey]) {
+        setMeasurandData((prev) => ({
+          ...prev,
+          [selectedMeasurandName]: historicalCache[cacheKey],
+        }));
+        showSnackbar(`${selectedMeasurandName} added from cache`, "success");
+        return;
+      }
+
+      try {
+        const response = await axios.get(
+          `${BASE_URL}/historical/${table.terminalId}/${selectedMeasurand.measurandId}?from=${dateFilter.start}&to=${dateFilter.end}`
+        );
+        if (!response.data.success) throw new Error(response.data.message);
+        const result = response.data.data.map((item) => ({
+          timestamp: item.Timestamp,
+          value: item.MeasurandValue,
+        }));
+        historicalCache[cacheKey] = result;
+        setMeasurandData((prev) => ({
+          ...prev,
+          [selectedMeasurandName]: result,
+        }));
+        showSnackbar(`${selectedMeasurandName} added successfully`, "success");
+      } catch (error) {
+        console.error("Error fetching new measurand values:", error);
+        showSnackbar(
+          error.message || `Failed to add ${selectedMeasurandName}`,
+          "error"
+        );
+      }
     }
   };
 
-  // ---------------- Saves the current configuration -----------------
-  const handleSave = () => {
+  const handleSave = async () => {
     showSnackbar("Saving configuration", "info", true);
-    axios
-      .put(`${BASE_URL}/${tableId}`, {
+    try {
+      const response = await axios.put(`${BASE_URL}/${tableId}`, {
+        measurandIds,
         measurandNames: measurandOptions,
-      })
-      .then((response) => {
-        showSnackbar("Configuration saved successfully", "success");
-      })
-      .catch((error) => {
-        console.error("Error updating table:", error);
-        showSnackbar("Failed to save configuration", "error");
       });
+      if (!response.data.success) throw new Error(response.data.message);
+      showSnackbar("Configuration saved successfully", "success");
+    } catch (error) {
+      console.error("Error updating table:", error);
+      showSnackbar(error.message || "Failed to save configuration", "error");
+    }
   };
 
-  // ---------------- Calculates statistics for measurand data -----------------
   const calculateStats = useCallback(() => {
     const stats = {};
     Object.entries(measurandData).forEach(([measurand, data]) => {
@@ -433,14 +452,11 @@ const TableDetailsPage = () => {
     return stats;
   }, [measurandData]);
 
-  // ---------------- Generates rows for the data grid -----------------
   const generateRows = useCallback(() => {
     if (!Object.keys(measurandData).length) return [];
     const allTimestamps = new Set();
     Object.values(measurandData).forEach((measurandValues) => {
-      measurandValues.forEach((data) => {
-        allTimestamps.add(data.timestamp);
-      });
+      measurandValues.forEach((data) => allTimestamps.add(data.timestamp));
     });
 
     return Array.from(allTimestamps)
@@ -458,7 +474,6 @@ const TableDetailsPage = () => {
       });
   }, [measurandData, measurandOptions]);
 
-  // ---------------- Generates columns for the data grid -----------------
   const generateColumns = useCallback(() => {
     if (!table || !measurandOptions.length) return [];
 
@@ -470,7 +485,9 @@ const TableDetailsPage = () => {
         headerName: "Timestamp",
         width: 250,
         renderCell: (params) => (
-          <Typography variant="body2">{params.value}</Typography>
+          <Typography variant="body2">
+            {formatTimestamp(params.value)}
+          </Typography>
         ),
       },
       ...measurandOptions.map((option) => ({
@@ -534,7 +551,6 @@ const TableDetailsPage = () => {
     ];
   }, [table, measurandOptions, generateRows]);
 
-  // ---------------- Handles row selection in the data grid -----------------
   const handleRowSelection = (selectionModel) => {
     const newSelection = selectionModel.slice(0, 2);
     setSelectedRows(
@@ -542,9 +558,10 @@ const TableDetailsPage = () => {
     );
   };
 
-  // ---------------- Deletes a measurand from options -----------------
   const handleDeleteMeasurand = (option) => {
+    const index = measurandOptions.indexOf(option);
     setMeasurandOptions((prev) => prev.filter((opt) => opt !== option));
+    setMeasurandIds((prev) => prev.filter((_, i) => i !== index));
     setMeasurandData((prev) => {
       const newData = { ...prev };
       delete newData[option];
@@ -552,14 +569,12 @@ const TableDetailsPage = () => {
     });
   };
 
-  // ---------------- Exports table data to PDF -----------------
   const exportToPDF = () => {
     const doc = new jsPDF({
       orientation: "landscape",
       unit: "pt",
       format: "a4",
     });
-
     doc.setFontSize(16);
     doc.text(`Table Data - ${table?.profile || "Unknown"}`, 40, 40);
 
@@ -570,11 +585,10 @@ const TableDetailsPage = () => {
     const exportColumns = columns.map(
       (col) => col.headerNameText || col.headerName
     );
-
     const exportRows = rows.map((row) =>
       columns.map((col) =>
         col.field === "timestamp"
-          ? row[col.field]
+          ? formatTimestamp(row[col.field])
           : row[col.field] !== null && row[col.field] !== undefined
           ? Number(row[col.field]).toFixed(2)
           : "N/A"
@@ -619,7 +633,6 @@ const TableDetailsPage = () => {
     doc.save(`table_${tableId}_data.pdf`);
   };
 
-  // ---------------- Exports table data to Excel -----------------
   const exportToExcel = () => {
     const columns = generateColumns();
     const rows = generateRows();
@@ -628,7 +641,6 @@ const TableDetailsPage = () => {
     const exportColumns = columns.map(
       (col) => col.headerNameText || col.headerName
     );
-
     const exportRows = [
       exportColumns,
       ...rows.map((row) =>
@@ -667,10 +679,8 @@ const TableDetailsPage = () => {
     });
   };
 
-  // ---------------- Navigates back to previous page -----------------
   const handleBackClick = () => navigate(-1);
 
-  // ---------------- Loading state UI -----------------
   if (loading) {
     return (
       <Box
@@ -686,7 +696,6 @@ const TableDetailsPage = () => {
     );
   }
 
-  // ---------------- Table not found UI -----------------
   if (!table) {
     return (
       <Box sx={{ p: 4, textAlign: "center" }}>
@@ -742,11 +751,7 @@ const TableDetailsPage = () => {
             </IconButton>
             <Typography
               variant="h6"
-              sx={{
-                ml: 2,
-                fontWeight: 600,
-                letterSpacing: 0.5,
-              }}
+              sx={{ ml: 2, fontWeight: 600, letterSpacing: 0.5 }}
             >
               {table.profile.charAt(0).toUpperCase() + table.profile.slice(1)} -
               Table Details
@@ -863,11 +868,11 @@ const TableDetailsPage = () => {
                 </StyledMenuItem>
                 {availableMeasurands.map((option) => (
                   <StyledMenuItem
-                    key={option}
-                    value={option}
-                    isSelected={measurandOptions.includes(option)}
+                    key={option.measurandId}
+                    value={option.measurandName}
+                    isSelected={measurandOptions.includes(option.measurandName)}
                   >
-                    {option}
+                    {option.measurandName}
                   </StyledMenuItem>
                 ))}
               </Select>
@@ -974,7 +979,7 @@ const TableDetailsPage = () => {
                       boxShadow: "0 4px 15px rgba(0, 0, 0, 0.4)",
                       transition: "all 0.3s ease",
                       background: isDarkMode
-                        ? "linear-gradient #546e7a 0%, #546e7a 100%"
+                        ? "linear-gradient(#546e7a 0%, #546e7a 100%)"
                         : "linear-gradient(145deg,rgb(244, 244, 244) 0%,rgba(195, 195, 195, 0.44) 100%)",
                       "&:hover": {
                         transform: "translateY(-4px)",

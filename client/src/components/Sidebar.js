@@ -26,8 +26,8 @@ import {
   Delete as DeleteIcon,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
+import { preserveWidgetTemplatesAndClear } from "./localStorageUtils"; // Import utility
 
-// --------------- Base API endpoint from environment variables ---------------
 const API_BASE_URL = `${process.env.REACT_APP_API_LOCAL_URL}api`;
 
 const Sidebar = ({
@@ -46,7 +46,6 @@ const Sidebar = ({
   const [dashboardToDelete, setDashboardToDelete] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // ------------------ Memoized function to fetch dashboards ------------------
   const fetchDashboards = useCallback(async () => {
     setLoading(true);
     try {
@@ -63,19 +62,16 @@ const Sidebar = ({
     }
   }, [setShowSnackbar]);
 
-  // ------------------ Initial fetch on component mount ------------------
   useEffect(() => {
     fetchDashboards();
   }, [fetchDashboards]);
 
-  // ------------------ Fetch dashboards on update trigger ------------------
   useEffect(() => {
     if (onDashboardUpdate) {
       fetchDashboards();
     }
   }, [onDashboardUpdate, fetchDashboards]);
 
-  // ------------------ Loading state render ------------------
   if (loading) {
     return (
       <Drawer
@@ -122,7 +118,6 @@ const Sidebar = ({
     );
   }
 
-  // ------------------ Handler for dashboard selection ------------------
   const handleDashboardClick = async (dashboard) => {
     try {
       const response = await axios.get(
@@ -147,14 +142,12 @@ const Sidebar = ({
     }
   };
 
-  // ------------------ Handler for initiating dashboard deletion ------------------
   const handleDeleteClick = (dashboard, e) => {
     e.stopPropagation();
     setDashboardToDelete(dashboard);
     setDeleteDialogOpen(true);
   };
 
-  // ------------------ Handler for confirming dashboard deletion ------------------
   const handleDeleteConfirm = async () => {
     if (!dashboardToDelete) return;
 
@@ -162,7 +155,6 @@ const Sidebar = ({
       await axios.delete(
         `${API_BASE_URL}/dashboards/${dashboardToDelete.name}`
       );
-
       const updatedDashboards = dashboards.filter(
         (d) => d.name !== dashboardToDelete.name
       );
@@ -182,17 +174,11 @@ const Sidebar = ({
           message: `${dashboardToDelete.name} deleted, switched to ${nextDashboard.name}`,
           severity: "success",
         });
-      } else if (dashboardToDelete.isPublished) {
-        localStorage.removeItem("dashboardWidgets");
-        localStorage.removeItem("defaultDashboard");
+      } else {
+        preserveWidgetTemplatesAndClear(); // Clear except widget templates
         onDashboardSelect("", []);
         setShowSnackbar({
           message: `${dashboardToDelete.name} deleted, no dashboards remaining`,
-          severity: "success",
-        });
-      } else {
-        setShowSnackbar({
-          message: `${dashboardToDelete.name} deleted`,
           severity: "success",
         });
       }
@@ -209,6 +195,15 @@ const Sidebar = ({
     }
   };
 
+  const handleNewDashboardClick = () => {
+    onNewDashboard();
+    preserveWidgetTemplatesAndClear(); // Clear except widget templates
+    setShowSnackbar({
+      message: "New dashboard created",
+      severity: "success",
+    });
+  };
+
   return (
     <Drawer
       variant="temporary"
@@ -217,7 +212,6 @@ const Sidebar = ({
       onClose={toggleSidebar}
       PaperProps={{ sx: { width: 280, boxShadow: 3 } }}
     >
-      {/* ------------------ Sidebar header ------------------ */}
       <Box
         sx={{
           display: "flex",
@@ -235,7 +229,7 @@ const Sidebar = ({
           onClick={toggleSidebar}
           sx={{
             color: "white",
-            "&:hover": { backgroundColor: "rgba(255, 255, 255上班族, 0.08)" },
+            "&:hover": { backgroundColor: "rgba(255, 255, 255, 0.08)" },
           }}
         >
           <ChevronLeftIcon />
@@ -244,7 +238,6 @@ const Sidebar = ({
 
       <Divider />
 
-      {/* ------------------ New dashboard button ------------------ */}
       <Box sx={{ p: 2 }}>
         <Button
           variant="contained"
@@ -256,13 +249,7 @@ const Sidebar = ({
             textTransform: "none",
             fontWeight: 500,
           }}
-          onClick={() => {
-            onNewDashboard();
-            setShowSnackbar({
-              message: "New dashboard created",
-              severity: "success",
-            });
-          }}
+          onClick={handleNewDashboardClick}
         >
           New Dashboard
         </Button>
@@ -270,7 +257,6 @@ const Sidebar = ({
 
       <Divider />
 
-      {/* ------------------ Dashboard list ------------------ */}
       <List sx={{ px: 1, py: 1.5 }}>
         {dashboards.map((dashboard) => (
           <ListItem
@@ -337,7 +323,6 @@ const Sidebar = ({
         ))}
       </List>
 
-      {/* ------------------ Delete confirmation dialog ------------------ */}
       <Dialog
         open={deleteDialogOpen}
         onClose={() => setDeleteDialogOpen(false)}

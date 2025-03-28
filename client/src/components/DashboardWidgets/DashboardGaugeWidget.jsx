@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Doughnut } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -16,29 +16,12 @@ import {
 } from "@mui/material";
 import { styled } from "@mui/material/styles";
 import axios from "axios";
+import { formatTimestamp } from "./formatTimestamp";
 
 ChartJS.register(ArcElement, ChartTooltip, Legend);
 
+// --------------- Base API endpoint from environment variables ---------------
 const API_BASE_URL = `${process.env.REACT_APP_API_LOCAL_URL}api`;
-
-const customDefaultWidgetSettings = {
-  backgroundColor: "#cff7ba",
-  borderColor: "#417505",
-  borderRadius: "3px",
-  borderWidth: "1px",
-  titleColor: "#000000",
-  titleFontFamily: "Georgia",
-  titleFontSize: "24px",
-  titleFontStyle: "normal",
-  titleFontWeight: "normal",
-  titleTextDecoration: "none",
-  valueColor: "#d0021b",
-  valueFontFamily: "Arial",
-  valueFontSize: "24px",
-  valueFontStyle: "normal",
-  valueFontWeight: "bold",
-  valueTextDecoration: "none",
-};
 
 const StyledCard = styled(Card)(({ theme, settings }) => ({
   background: settings?.backgroundColor || theme.palette.background.paper,
@@ -62,21 +45,18 @@ const GaugeContainer = styled(Box)({
   alignItems: "center",
 });
 
-const formatTimestamp = (timestamp) => {
-  return timestamp || "No timestamp available";
-};
-
+// --------------------------- Function renders a gauge widget for the dashboard -------------------------------
 const DashboardGaugeWidget = ({ data, width, height }) => {
   const theme = useTheme();
-  const settings = { ...customDefaultWidgetSettings, ...(data.settings || {}) };
+  const settings = data.settings || {};
   const [measurementData, setMeasurementData] = useState({
-    value: 0, // Start with 0 or a default value
+    value: 0,
     timestamp: null,
-    unit: data.unit || "",
   });
   const [error, setError] = useState(null);
 
-  const fetchMeasurementData = async () => {
+  // --------------------------- Function fetches measurement data from the API -------------------------------
+  const fetchMeasurementData = useCallback(async () => {
     try {
       const { plant, terminal, measurement } = data;
       if (!plant || !terminal || !measurement) {
@@ -92,23 +72,22 @@ const DashboardGaugeWidget = ({ data, width, height }) => {
         setMeasurementData({
           value: parseFloat(latestData.MeasurandValue) || 0,
           timestamp: latestData.TimeStamp,
-          unit: latestData.Unit || data.unit || "",
         });
       }
       setError(null);
     } catch (err) {
       console.error("Error fetching measurement data:", err);
       setError("Failed to fetch data");
-      // Optionally keep the last value instead of resetting
     }
-  };
+  }, [data]);
 
   useEffect(() => {
-    fetchMeasurementData(); // Initial fetch
-    const interval = setInterval(fetchMeasurementData, 5000); // Poll every 5 seconds for live updates
+    fetchMeasurementData();
+    const interval = setInterval(fetchMeasurementData, 5000);
     return () => clearInterval(interval);
-  }, [data.plant, data.terminal, data.measurement]);
+  }, [data.plant, data.terminal, data.measurement, fetchMeasurementData]);
 
+  // --------------------------- Function calculates gauge values and configurations -------------------------------
   const minValue = data.minRange || 0;
   const maxValue = data.maxRange || 100;
   const displayValue = Math.max(
@@ -128,6 +107,7 @@ const DashboardGaugeWidget = ({ data, width, height }) => {
     { start: minValue + (2 * range) / 3, end: maxValue, color: "#4caf50" },
   ];
 
+  // --------------------------- Function determines the gauge color based on value ranges -------------------------------
   const getGaugeColor = () => {
     for (const range of ranges) {
       if (displayValue >= range.start && displayValue <= range.end) {
@@ -178,22 +158,22 @@ const DashboardGaugeWidget = ({ data, width, height }) => {
             paddingBottom: 0,
           }}
         >
+          {/* --------------------------- Section for gauge widget title ------------------------------- */}
           <Typography
-            color={settings.titleColor}
             sx={{
-              fontWeight: settings.titleFontWeight,
-              fontSize: settings.titleFontSize,
-              fontFamily: settings.titleFontFamily,
-              fontStyle: settings.titleFontStyle,
-              textDecoration: settings.titleTextDecoration,
-              color: settings.titleColor,
-          
+              fontWeight: settings.titleFontWeight || "normal",
+              fontSize: settings.titleFontSize || "14px",
+              fontFamily: settings.titleFontFamily || "inherit",
+              fontStyle: settings.titleFontStyle || "normal",
+              textDecoration: settings.titleTextDecoration || "none",
+              color: settings.titleColor || "#000000",
               textAlign: "center",
               mb: 1,
             }}
           >
             {data.name || "Gauge Widget"}
           </Typography>
+          {/* --------------------------- Section for gauge chart and value display ------------------------------- */}
           <GaugeContainer>
             <Box sx={{ position: "relative", width: "100%", height: "100%" }}>
               <Doughnut
@@ -208,32 +188,34 @@ const DashboardGaugeWidget = ({ data, width, height }) => {
                   top: "50%",
                   left: "50%",
                   transform: "translate(-50%, -50%)",
-                  fontSize: settings.valueFontSize,
-                  fontWeight: settings.valueFontWeight,
-                  color: settings.valueColor,
-                  fontFamily: settings.valueFontFamily,
-                  fontStyle: settings.valueFontStyle,
-                  textDecoration: settings.valueTextDecoration,
+                  fontSize: settings.valueFontSize || "24px",
+                  fontWeight: settings.valueFontWeight || "normal",
+                  color: settings.valueColor || "#000000",
+                  fontFamily: settings.valueFontFamily || "inherit",
+                  fontStyle: settings.valueFontStyle || "normal",
+                  textDecoration: settings.valueTextDecoration || "none",
                 }}
               >
                 {error ? "Error" : displayValue.toFixed(data.decimals || 1)}
               </Typography>
-              <Typography
-                sx={{
-                  position: "absolute",
-                  bottom: "10%",
-                  left: "50%",
-                  transform: "translateX(-50%)",
-                  fontWeight: settings.titleFontWeight,
-                  fontSize: settings.titleFontSize,
-                  fontFamily: settings.titleFontFamily,
-                  fontStyle: settings.titleFontStyle,
-                  textDecoration: settings.titleTextDecoration,
-                  color: settings.titleColor,
-                }}
-              >
-                {measurementData.unit}
-              </Typography>
+              {data.unit && (
+                <Typography
+                  sx={{
+                    position: "absolute",
+                    bottom: "10%",
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                    fontWeight: settings.titleFontWeight || "normal",
+                    fontSize: settings.titleFontSize || "14px",
+                    fontFamily: settings.titleFontFamily || "inherit",
+                    fontStyle: settings.titleFontStyle || "normal",
+                    textDecoration: settings.titleTextDecoration || "none",
+                    color: settings.titleColor || "#000000",
+                  }}
+                >
+                  {data.unit}
+                </Typography>
+              )}
             </Box>
           </GaugeContainer>
         </CardContent>

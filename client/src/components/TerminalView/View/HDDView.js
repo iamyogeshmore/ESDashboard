@@ -20,7 +20,6 @@ import {
 } from "@mui/material";
 import { styled } from "@mui/material/styles";
 import { useNavigate } from "react-router-dom";
-
 import {
   Add as AddIcon,
   Storage as StorageIcon,
@@ -28,14 +27,11 @@ import {
   LocationOn as LocationOnIcon,
   Delete as DeleteIcon,
 } from "@mui/icons-material";
-
 import CreateTableDialog from "../CreationForm/CreateTableDialog";
 import DeleteConfirmationDialog from "../../DeleteConfirmationDialog";
 
-// --------------- Base API endpoint fetched from environment variables ---------------
 const BASE_URL = `${process.env.REACT_APP_API_LOCAL_URL}api/hdd`;
 
-// --------------- Styled component for animated card with hover effects ---------------
 const AnimatedCard = styled(Card)(({ theme }) => ({
   backgroundColor: theme.palette.background.paper,
   color: theme.palette.text.primary,
@@ -54,7 +50,6 @@ const AnimatedCard = styled(Card)(({ theme }) => ({
   },
 }));
 
-// --------------- Styled floating action button for adding new tables ---------------
 const TopRightAddButton = styled(Fab)(({ theme }) => ({
   position: "absolute",
   top: theme.spacing(2),
@@ -68,7 +63,6 @@ const TopRightAddButton = styled(Fab)(({ theme }) => ({
   },
 }));
 
-// --------------- Custom styled Alert for red delete notification ---------------
 const DeleteAlert = styled(Alert)(({ theme }) => ({
   backgroundColor: theme.palette.error.main,
   color: theme.palette.error.contrastText,
@@ -79,7 +73,6 @@ const DeleteAlert = styled(Alert)(({ theme }) => ({
 
 const HDDView = () => {
   const navigate = useNavigate();
-
   const [tables, setTables] = useState([]);
   const [tableDialogOpen, setTableDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -92,18 +85,18 @@ const HDDView = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // --------------- Fetch tables from API with error handling ---------------
   const fetchTables = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       const response = await axios.get(BASE_URL);
-      setTables(response.data);
+      if (!response.data.success) throw new Error(response.data.message);
+      setTables(response.data.data);
     } catch (error) {
-      setError("Failed to fetch tables");
+      setError(error.message || "Failed to fetch tables");
       setSnackbar({
         open: true,
-        message: "Error loading tables",
+        message: error.message || "Error loading tables",
         severity: "error",
       });
       console.error("Error fetching HDD views:", error);
@@ -112,7 +105,6 @@ const HDDView = () => {
     }
   }, []);
 
-  // --------------- Handle table creation with API call ---------------
   const handleTableCreate = async (tableData) => {
     if (tableData.error) {
       setSnackbar({
@@ -125,7 +117,8 @@ const HDDView = () => {
 
     try {
       const response = await axios.post(`${BASE_URL}/create`, tableData);
-      setTables((prev) => [...prev, response.data]);
+      if (!response.data.success) throw new Error(response.data.message);
+      setTables((prev) => [...prev, response.data.data]);
       setSnackbar({
         open: true,
         message: "Table created successfully!",
@@ -135,19 +128,19 @@ const HDDView = () => {
     } catch (error) {
       setSnackbar({
         open: true,
-        message: "Error creating table",
+        message: error.message || "Error creating table",
         severity: "error",
       });
       console.error("Error creating HDD view:", error);
     }
   };
 
-  // --------------- Handle table deletion with API call ---------------
   const handleDeleteTable = async () => {
     if (!tableToDelete) return;
 
     try {
-      await axios.delete(`${BASE_URL}/${tableToDelete}`);
+      const response = await axios.delete(`${BASE_URL}/${tableToDelete}`);
+      if (!response.data.success) throw new Error(response.data.message);
       setTables((prev) => prev.filter((table) => table._id !== tableToDelete));
       setSnackbar({
         open: true,
@@ -157,7 +150,7 @@ const HDDView = () => {
     } catch (error) {
       setSnackbar({
         open: true,
-        message: "Error deleting table",
+        message: error.message || "Error deleting table",
         severity: "error",
       });
       console.error("Error deleting HDD view:", error);
@@ -167,42 +160,32 @@ const HDDView = () => {
     }
   };
 
-  // --------------- Fetch tables on component mount ---------------
   useEffect(() => {
     fetchTables();
   }, [fetchTables]);
 
-  // --------------- Open create table dialog ---------------
   const handleAddTable = () => setTableDialogOpen(true);
 
-  // --------------- Navigate to specific table view ---------------
   const handleTableClick = (tableId) => {
     navigate(`/hdd/table/${tableId}`);
   };
 
-  // --------------- Initiate table deletion process ---------------
   const handleDeleteClick = (tableId) => {
     setTableToDelete(tableId);
     setDeleteDialogOpen(true);
   };
 
-  // --------------- Close delete confirmation dialog ---------------
   const handleDeleteDialogClose = () => {
     setDeleteDialogOpen(false);
     setTableToDelete(null);
   };
 
-  // --------------- Close snackbar notification ---------------
   const handleSnackbarClose = () => {
     setSnackbar((prev) => ({ ...prev, open: false }));
   };
 
-  // --------------- Animation transition for Snackbar ---------------
-  const TransitionSlide = (props) => {
-    return <Slide {...props} direction="left" />;
-  };
+  const TransitionSlide = (props) => <Slide {...props} direction="left" />;
 
-  // --------------- Render loading state ---------------
   if (loading) {
     return (
       <Box
@@ -219,7 +202,6 @@ const HDDView = () => {
     );
   }
 
-  // --------------- Render error state ---------------
   if (error) {
     return (
       <Container
@@ -243,7 +225,6 @@ const HDDView = () => {
     );
   }
 
-  // --------------- Main render of table view ---------------
   return (
     <Box
       sx={{
@@ -253,7 +234,6 @@ const HDDView = () => {
         position: "relative",
       }}
     >
-      {/* --------------- Floating button to add new table --------------- */}
       <TopRightAddButton
         color="primary"
         aria-label="add"
@@ -264,14 +244,12 @@ const HDDView = () => {
 
       <Container maxWidth="lg">
         {tables.length > 0 ? (
-          // --------------- Display grid of table cards ---------------
           <Grid container spacing={3}>
             {tables.map((table) => (
               <Grid item xs={12} sm={6} md={4} key={table._id}>
                 <AnimatedCard>
                   <CardActionArea onClick={() => handleTableClick(table._id)}>
                     <CardContent>
-                      {/* --------------- Table profile header --------------- */}
                       <Box
                         sx={{ display: "flex", alignItems: "center", mb: 2 }}
                       >
@@ -291,7 +269,6 @@ const HDDView = () => {
                           Profile
                         </Typography>
                       </Box>
-                      {/* --------------- Table details --------------- */}
                       <Box
                         sx={{
                           display: "flex",
@@ -304,7 +281,7 @@ const HDDView = () => {
                             sx={{ mr: 1, color: "text.secondary" }}
                           />
                           <Typography color="text.secondary">
-                            Plant: {table.plantName}
+                            Plant: {table.plantName || "Unknown"}
                           </Typography>
                         </Box>
                         <Box sx={{ display: "flex", alignItems: "center" }}>
@@ -312,11 +289,13 @@ const HDDView = () => {
                             sx={{ mr: 1, color: "text.secondary" }}
                           />
                           <Typography color="text.secondary">
-                            Terminal: {table.terminalName}
+                            Terminal: {table.terminalName || "Unknown"}
                           </Typography>
                         </Box>
                         <Chip
-                          label={`${table.measurandNames.length} Measurands`}
+                          label={`${
+                            table.measurandNames?.length || 0
+                          } Measurands`}
                           color="primary"
                           variant="outlined"
                           sx={{ alignSelf: "flex-start", mt: 1 }}
@@ -331,7 +310,6 @@ const HDDView = () => {
                       </Box>
                     </CardContent>
                   </CardActionArea>
-                  {/* --------------- Delete button for each card --------------- */}
                   <IconButton
                     className="delete-icon"
                     sx={{
@@ -352,7 +330,6 @@ const HDDView = () => {
             ))}
           </Grid>
         ) : (
-          // --------------- Display empty state message ---------------
           <Paper
             elevation={2}
             sx={{
@@ -370,14 +347,12 @@ const HDDView = () => {
           </Paper>
         )}
 
-        {/* --------------- Dialog for creating new tables --------------- */}
         <CreateTableDialog
           open={tableDialogOpen}
           onClose={() => setTableDialogOpen(false)}
           onCreate={handleTableCreate}
         />
 
-        {/* --------------- Dialog for delete confirmation --------------- */}
         <DeleteConfirmationDialog
           open={deleteDialogOpen}
           onClose={handleDeleteDialogClose}
@@ -386,7 +361,6 @@ const HDDView = () => {
           message="Are you sure you want to delete this table? This action cannot be undone."
         />
 
-        {/* --------------- Animated notification snackbar positioned top-right below navbar --------------- */}
         <Snackbar
           open={snackbar.open}
           autoHideDuration={6000}

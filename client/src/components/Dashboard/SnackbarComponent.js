@@ -1,6 +1,7 @@
 import React from "react";
 import { Snackbar, Alert } from "@mui/material";
 
+// --------------------------- Function renders a snackbar notification with customizable message and severity -------------------------------
 const SnackbarComponent = ({ open, message, severity, onClose }) => (
   <Snackbar
     open={open}

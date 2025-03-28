@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import {
   Chart as ChartJS,
   LineElement,
@@ -52,6 +52,41 @@ ChartJS.register(
   Filler
 );
 
+const formatTimestamp = (timestamp) => {
+  if (!timestamp) return "";
+  const date = new Date(timestamp);
+  return date.toLocaleString("en-US", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+    timeZone: "UTC",
+  });
+};
+
+const customDefaultWidgetSettings = {
+  backgroundColor: "#000000",
+  borderColor: "#ffffff",
+  borderRadius: "3px",
+  borderWidth: "1px",
+  titleColor: "#ffffff",
+  titleFontFamily: "Arial",
+  titleFontSize: "24px",
+  titleFontStyle: "normal",
+  titleFontWeight: "normal",
+  titleTextDecoration: "none",
+  valueColor: "#e0e0e0",
+  valueFontFamily: "Arial",
+  valueFontSize: "24px",
+  valueFontStyle: "normal",
+  valueFontWeight: "normal",
+  valueTextDecoration: "none",
+  widgetName: "Custom Widget",
+};
+
 const colorOptions = [
   { name: "Teal", value: "rgba(0, 128, 128, 1)", bg: "rgba(0, 128, 128, 0.2)" },
   {
@@ -75,33 +110,35 @@ const colorOptions = [
   { name: "Cyan", value: "rgba(0, 255, 255, 1)", bg: "rgba(0, 255, 255, 0.2)" },
 ];
 
-const GraphPaper = styled(Paper)(({ theme, isDarkMode, isFullscreen }) => ({
-  height: isFullscreen ? "100vh" : "100%",
-  width: isFullscreen ? "100vw" : "100%",
-  padding: theme.spacing(2),
-  background: isDarkMode
-    ? "linear-gradient(145deg, #2a2a2a 0%, #1f1f1f 100%)"
-    : "linear-gradient(145deg, #ffffff 0%, #f1f5f9 100%)",
-  borderRadius: isFullscreen ? 0 : "12px",
-  border: `1px solid ${isDarkMode ? "#4b5563" : "#d1d5db"}`,
-  boxShadow: isDarkMode
-    ? "0 4px 20px rgba(0, 0, 0, 0.5)"
-    : "0 4px 20px rgba(0, 0, 0, 0.05)",
-  transition: "all 0.3s ease",
-  "&:hover": !isFullscreen && {
-    transform: "translateY(-2px)",
+const GraphPaper = styled(Paper)(
+  ({ theme, isDarkMode, isFullscreen, styles }) => ({
+    height: isFullscreen ? "100vh" : "100%",
+    width: isFullscreen ? "100vw" : "100%",
+    padding: theme.spacing(2),
+    background: isDarkMode
+      ? "linear-gradient(145deg, #2a2a2a 0%, #1f1f1f 100%)"
+      : styles.backgroundColor,
+    borderRadius: isFullscreen ? 0 : styles.borderRadius,
+    border: `${styles.borderWidth} solid ${styles.borderColor}`,
     boxShadow: isDarkMode
-      ? "0 6px 24px rgba(0, 0, 0, 0.6)"
-      : "0 6px 24px rgba(0, 0, 0, 0.1)",
-  },
-  display: "flex",
-  flexDirection: "column",
-  position: isFullscreen ? "fixed" : "relative",
-  top: isFullscreen ? 0 : "auto",
-  left: isFullscreen ? 0 : "auto",
-  zIndex: isFullscreen ? 1300 : "auto",
-  overflow: "hidden",
-}));
+      ? "0 4px 20px rgba(0, 0, 0, 0.5)"
+      : "0 4px 20px rgba(0, 0, 0, 0.05)",
+    transition: "all 0.3s ease",
+    "&:hover": !isFullscreen && {
+      transform: "translateY(-2px)",
+      boxShadow: isDarkMode
+        ? "0 6px 24px rgba(0, 0, 0, 0.6)"
+        : "0 6px 24px rgba(0, 0, 0, 0.1)",
+    },
+    display: "flex",
+    flexDirection: "column",
+    position: isFullscreen ? "fixed" : "relative",
+    top: isFullscreen ? 0 : "auto",
+    left: isFullscreen ? 0 : "auto",
+    zIndex: isFullscreen ? 1300 : "auto",
+    overflow: "hidden",
+  })
+);
 
 const WidgetHeader = styled(Box)(({ theme, isDarkMode }) => ({
   display: "flex",
@@ -164,20 +201,6 @@ const ApplyButton = styled(Button)(({ theme, isDarkMode }) => ({
   transition: "all 0.3s ease",
 }));
 
-const formatTimestamp = (timestamp) => {
-  if (!timestamp) return "";
-  const date = new Date(timestamp);
-  return date.toLocaleString("en-US", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  });
-};
-
 Tooltip.positioners.custom = function (elements, eventPosition) {
   return { x: eventPosition.x, y: eventPosition.y - 20 };
 };
@@ -222,6 +245,7 @@ const GraphWidget = ({
   onDelete,
   onOpenProperties,
   availableMeasurands = [],
+  ...initialProperties
 }) => {
   const theme = useTheme();
   const isDarkMode = theme.palette.mode === "dark";
@@ -242,12 +266,32 @@ const GraphWidget = ({
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarSeverity, setSnackbarSeverity] = useState("success");
+
   const parsedXAxisConfig = xAxisConfiguration
     ? xAxisConfiguration.split(":").reduce((acc, part, index) => {
         acc[index === 0 ? "type" : "value"] = part;
         return acc;
       }, {})
     : { type: "category", value: "timestamp" };
+
+  const styles = useMemo(() => {
+    const storedSettings = widgetId
+      ? localStorage.getItem(`widgetSettings_${widgetId}`)
+      : null;
+    const baseStyles = {
+      ...customDefaultWidgetSettings,
+      ...(storedSettings ? JSON.parse(storedSettings) : {}),
+      ...initialProperties,
+    };
+    return isDarkMode
+      ? {
+          ...baseStyles,
+          titleColor: baseStyles.titleColor,
+          backgroundColor: "linear-gradient(145deg, #2a2a2a 0%, #1f1f1f 100%)",
+          borderColor: "#4b5563",
+        }
+      : baseStyles;
+  }, [widgetId, initialProperties, isDarkMode]);
 
   useEffect(() => {
     let isMounted = true;
@@ -484,6 +528,7 @@ const GraphWidget = ({
       elevation={2}
       isDarkMode={isDarkMode}
       isFullscreen={isFullscreen}
+      styles={styles}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -502,9 +547,12 @@ const GraphWidget = ({
           <Typography
             variant="h6"
             sx={{
-              color: isDarkMode ? "#f3f4f6" : "#1f2937",
-              fontWeight: "600",
-              fontFamily: "Inter",
+              color: styles.titleColor,
+              fontFamily: styles.titleFontFamily,
+              fontSize: styles.titleFontSize,
+              fontWeight: styles.titleFontWeight,
+              fontStyle: styles.titleFontStyle,
+              textDecoration: styles.titleTextDecoration,
               letterSpacing: "0.2px",
             }}
           >

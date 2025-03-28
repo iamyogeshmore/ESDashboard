@@ -2,26 +2,6 @@ import React from "react";
 import { Paper, Typography, Box } from "@mui/material";
 import { styled } from "@mui/material/styles";
 
-const customDefaultWidgetSettings = {
-  backgroundColor: "#cff7ba",
-  borderColor: "#417505",
-  borderRadius: "3px",
-  borderWidth: "1px",
-  titleColor: "#000000",
-  titleFontFamily: "Georgia",
-  titleFontSize: "14px",
-  titleFontStyle: "normal",
-  titleFontWeight: "normal",
-  titleTextDecoration: "none",
-  valueColor: "#d0021b",
-  valueFontFamily: "Arial",
-  valueFontSize: "24px",
-  valueFontStyle: "normal",
-  valueFontWeight: "bold",
-  valueTextDecoration: "none",
-};
-
-// ------------- Styled component for the paper container with custom settings ------------------
 const StyledPaper = styled(Paper)(({ theme, settings }) => ({
   padding: theme.spacing(2),
   boxShadow: theme.shadows[2],
@@ -34,7 +14,7 @@ const StyledPaper = styled(Paper)(({ theme, settings }) => ({
 }));
 
 const DashboardImageWidget = ({ data, width, height }) => {
-  const settings = { ...customDefaultWidgetSettings, ...(data.settings || {}) };
+  const settings = data.settings || {};
 
   return (
     <StyledPaper settings={settings} sx={{ width: "100%", height: "100%" }}>

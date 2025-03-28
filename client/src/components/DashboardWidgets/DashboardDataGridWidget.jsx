@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useCallback } from "react";
 import axios from "axios";
 import {
   Paper,
@@ -15,26 +15,10 @@ import {
 } from "@mui/material";
 import { styled } from "@mui/material/styles";
 import { ThemeContext } from "../../contexts/ThemeContext";
+import { formatTimestamp } from "./formatTimestamp";
 
+// --------------- Base API endpoint from environment variables ---------------
 const API_BASE_URL = `${process.env.REACT_APP_API_LOCAL_URL}api`;
-
-const customDefaultWidgetSettings = {
-  backgroundColor: "#cff7ba",
-  borderColor: "#417505",
-  borderRadius: "3px",
-  borderWidth: "1px",
-  titleColor: "#000000",
-  titleFontFamily: "Georgia",
-  titleFontSize: "16px",
-  titleFontStyle: "normal",
-  titleFontWeight: "normal",
-  titleTextDecoration: "none",
-  valueColor: "#d0021b",
-  valueFontFamily: "Arial",
-  valueFontSize: "14px",
-  valueFontStyle: "normal",
-  valueTextDecoration: "none",
-};
 
 const StyledPaper = styled(Paper)(({ theme, settings }) => ({
   padding: theme.spacing(2),
@@ -54,7 +38,7 @@ const StyledTableCell = styled(TableCell)(({ theme, settings }) => ({
   width: "200px",
   height: "40px",
   maxWidth: "200px",
-  backgroundColor: settings?.backgroundColor,
+  backgroundColor: settings?.backgroundColor || "inherit",
   textAlign: "center",
 }));
 
@@ -66,15 +50,11 @@ const StyledHeaderCell = styled(TableCell)(({ theme, settings }) => ({
   width: "200px",
   height: "40px",
   maxWidth: "200px",
-  backgroundColor: settings?.backgroundColor,
+  backgroundColor: settings?.backgroundColor || "inherit",
   textAlign: "center",
 }));
 
-// Updated formatTimestamp to return raw timestamp string as-is
-const formatTimestamp = (timestamp) => {
-  return timestamp || "--";
-};
-
+// --------------------------- Function renders a data grid widget for the dashboard -------------------------------
 const DashboardDataGridWidget = ({
   data,
   width,
@@ -83,7 +63,7 @@ const DashboardDataGridWidget = ({
   isPublished,
 }) => {
   const { isDarkMode } = useContext(ThemeContext);
-  const settings = { ...customDefaultWidgetSettings, ...(data.settings || {}) };
+  const settings = data.settings || {};
   const rows = parseInt(data.rows) || 1;
   const measurandColumns = parseInt(data.columns) || 1;
   const addTimestamp = data.addTimestamp || false;
@@ -123,7 +103,8 @@ const DashboardDataGridWidget = ({
     });
   }, [dashboardName, data]);
 
-  const saveSelectionsToDB = async () => {
+  // --------------------------- Function saves selected plant, terminals, and measurements to the database -------------------------------
+  const saveSelectionsToDB = useCallback(async () => {
     if (!dashboardName || !data.id) {
       console.error(
         "Cannot save selections: dashboardName or data.id is undefined",
@@ -145,9 +126,16 @@ const DashboardDataGridWidget = ({
     } catch (error) {
       console.error("Error saving selections:", error);
     }
-  };
+  }, [
+    dashboardName,
+    data.id,
+    selectedPlant,
+    selectedTerminals,
+    selectedMeasurements,
+  ]);
 
-  const fetchPlants = async () => {
+  // --------------------------- Function fetches plant data from the API -------------------------------
+  const fetchPlants = useCallback(async () => {
     try {
       const response = await axios.get(`${API_BASE_URL}/plants`);
       const newPlants = response.data;
@@ -159,44 +147,53 @@ const DashboardDataGridWidget = ({
       console.error("Error fetching plants:", error);
       setPlants([]);
     }
-  };
+  }, [selectedPlant]);
 
-  const fetchTerminals = async (plantName) => {
-    if (!plantName) return;
-    try {
-      const response = await axios.get(
-        `${API_BASE_URL}/terminals/${plantName}`
-      );
-      const newTerminals = response.data;
-      setTerminals(newTerminals);
-      if (newTerminals.length > 0 && !selectedTerminals.some((t) => t)) {
-        setSelectedTerminals(Array(rows).fill(newTerminals[0].TerminalName));
-      }
-    } catch (error) {
-      console.error("Error fetching terminals:", error);
-      setTerminals([]);
-    }
-  };
-
-  const fetchMeasurands = async (plantName, terminalName) => {
-    if (!plantName || !terminalName) return;
-    try {
-      const response = await axios.get(
-        `${API_BASE_URL}/measurands/${plantName}/${terminalName}`
-      );
-      const newMeasurands = response.data;
-      setMeasurands(newMeasurands);
-      if (newMeasurands.length > 0 && !selectedMeasurements.some((m) => m)) {
-        setSelectedMeasurements(
-          Array(measurandColumns).fill(newMeasurands[0].MeasurandName)
+  // --------------------------- Function fetches terminal data for a given plant -------------------------------
+  const fetchTerminals = useCallback(
+    async (plantName) => {
+      if (!plantName) return;
+      try {
+        const response = await axios.get(
+          `${API_BASE_URL}/terminals/${plantName}`
         );
+        const newTerminals = response.data;
+        setTerminals(newTerminals);
+        if (newTerminals.length > 0 && !selectedTerminals.some((t) => t)) {
+          setSelectedTerminals(Array(rows).fill(newTerminals[0].TerminalName));
+        }
+      } catch (error) {
+        console.error("Error fetching terminals:", error);
+        setTerminals([]);
       }
-    } catch (error) {
-      console.error("Error fetching measurands:", error);
-      setMeasurands([]);
-    }
-  };
+    },
+    [rows, selectedTerminals]
+  );
 
+  // --------------------------- Function fetches measurand data for a given plant and terminal -------------------------------
+  const fetchMeasurands = useCallback(
+    async (plantName, terminalName) => {
+      if (!plantName || !terminalName) return;
+      try {
+        const response = await axios.get(
+          `${API_BASE_URL}/measurands/${plantName}/${terminalName}`
+        );
+        const newMeasurands = response.data;
+        setMeasurands(newMeasurands);
+        if (newMeasurands.length > 0 && !selectedMeasurements.some((m) => m)) {
+          setSelectedMeasurements(
+            Array(measurandColumns).fill(newMeasurands[0].MeasurandName)
+          );
+        }
+      } catch (error) {
+        console.error("Error fetching measurands:", error);
+        setMeasurands([]);
+      }
+    },
+    [measurandColumns, selectedMeasurements]
+  );
+
+  // --------------------------- Function fetches measurement data for a specific plant, terminal, and measurand -------------------------------
   const fetchMeasurementData = async (plant, terminal, measurand) => {
     if (!plant || !terminal || !measurand)
       return { value: "--", timestamp: "", unit: "" };
@@ -230,16 +227,16 @@ const DashboardDataGridWidget = ({
 
   useEffect(() => {
     if (!plants.length) fetchPlants();
-  }, []);
+  }, [plants.length, fetchPlants]);
 
   useEffect(() => {
     if (selectedPlant) fetchTerminals(selectedPlant);
-  }, [selectedPlant]);
+  }, [selectedPlant, fetchTerminals]);
 
   useEffect(() => {
     if (selectedPlant && selectedTerminals[0])
       fetchMeasurands(selectedPlant, selectedTerminals[0]);
-  }, [selectedPlant, selectedTerminals]);
+  }, [selectedPlant, selectedTerminals, fetchMeasurands]);
 
   useEffect(() => {
     let isMounted = true;
@@ -300,8 +297,16 @@ const DashboardDataGridWidget = ({
       isMounted = false;
       clearInterval(interval);
     };
-  }, [selectedPlant, selectedTerminals, selectedMeasurements]);
+  }, [
+    selectedPlant,
+    selectedTerminals,
+    selectedMeasurements,
+    rows,
+    measurandColumns,
+    saveSelectionsToDB,
+  ]);
 
+  // --------------------------- Function handles plant selection change -------------------------------
   const handlePlantChange = (_, value) => {
     setSelectedPlant(value);
     setSelectedTerminals(Array(rows).fill(""));
@@ -316,6 +321,7 @@ const DashboardDataGridWidget = ({
     saveSelectionsToDB();
   };
 
+  // --------------------------- Function handles terminal selection change for a specific row -------------------------------
   const handleTerminalChange = (rowIdx, value) => {
     const newTerminals = [...selectedTerminals];
     newTerminals[rowIdx] = value;
@@ -323,6 +329,7 @@ const DashboardDataGridWidget = ({
     saveSelectionsToDB();
   };
 
+  // --------------------------- Function handles measurement selection change for a specific column -------------------------------
   const handleMeasurementChange = (colIdx, value) => {
     const newMeasurements = [...selectedMeasurements];
     newMeasurements[colIdx] = value;
@@ -330,6 +337,7 @@ const DashboardDataGridWidget = ({
     saveSelectionsToDB();
   };
 
+  // --------------------------- Function renders a dropdown for selecting plants, terminals, or measurements -------------------------------
   const renderDropdown = (type, value, options, onChange, index) => {
     if (isPublished) {
       return null;
@@ -345,12 +353,6 @@ const DashboardDataGridWidget = ({
             fontSize: "0.875rem",
             height: "40px",
             backgroundColor: isDarkMode ? "#2c2c2c" : "#ffffff",
-            color: settings.titleColor,
-            fontFamily: settings.titleFontFamily,
-            fontSize: settings.titleFontSize,
-            fontStyle: settings.titleFontStyle,
-            fontWeight: settings.titleFontWeight,
-            textDecoration: settings.titleTextDecoration,
             "& .MuiSelect-icon": {
               color: isDarkMode ? "#e0e0e0" : "#1976d2",
             },
@@ -362,12 +364,6 @@ const DashboardDataGridWidget = ({
             PaperProps: {
               sx: {
                 backgroundColor: isDarkMode ? "#2c2c2c" : "#ffffff",
-                color: settings.titleColor,
-                fontFamily: settings.titleFontFamily,
-                fontSize: settings.titleFontSize,
-                fontStyle: settings.titleFontStyle,
-                fontWeight: settings.titleFontWeight,
-                textDecoration: settings.titleTextDecoration,
               },
             },
           }}
@@ -412,63 +408,62 @@ const DashboardDataGridWidget = ({
     );
   };
 
+  // --------------------------- Function returns typography styles based on type (title or value) -------------------------------
+  const getTypographyStyles = (type) => ({
+    color:
+      type === "title"
+        ? settings.titleColor || "#000000"
+        : settings.valueColor || "#000000",
+    fontFamily:
+      type === "title"
+        ? settings.titleFontFamily || "inherit"
+        : settings.valueFontFamily || "inherit",
+    fontSize:
+      type === "title"
+        ? settings.titleFontSize || "14px"
+        : settings.valueFontSize || "14px",
+    fontStyle:
+      type === "title"
+        ? settings.titleFontStyle || "normal"
+        : settings.valueFontStyle || "normal",
+    fontWeight:
+      type === "title"
+        ? settings.titleFontWeight || "normal"
+        : settings.valueFontWeight || "normal",
+    textDecoration:
+      type === "title"
+        ? settings.titleTextDecoration || "none"
+        : settings.valueTextDecoration || "none",
+    wordWrap: "break-word",
+    maxWidth: "200px",
+  });
+
   return (
     <StyledPaper
       settings={settings}
       sx={{ width: "100%", height: "100%", overflow: "auto" }}
     >
+      {/* --------------------------- Section for widget title and plant selection ------------------------------- */}
       <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
-        <Typography
-          sx={{
-            color: settings.titleColor,
-            fontFamily: settings.titleFontFamily,
-            fontSize: settings.titleFontSize,
-            fontStyle: settings.titleFontStyle,
-            fontWeight: settings.titleFontWeight,
-            textDecoration: settings.titleTextDecoration,
-          }}
-        >
-          {data.name}
-        </Typography>
+        <Typography sx={getTypographyStyles("title")}>{data.name}</Typography>
         {!isPublished && (
           <Box sx={{ ml: 2 }}>
             {renderDropdown("Plant", selectedPlant, plants, handlePlantChange)}
           </Box>
         )}
       </Box>
+      {/* --------------------------- Section for data grid table ------------------------------- */}
       <Table>
         <TableHead>
           <TableRow>
             <StyledHeaderCell settings={settings}>
-              <Typography
-                sx={{
-                  color: settings.titleColor,
-                  fontFamily: settings.titleFontFamily,
-                  fontSize: settings.titleFontSize,
-                  fontStyle: settings.titleFontStyle,
-                  fontWeight: settings.titleFontWeight,
-                  textDecoration: settings.titleTextDecoration,
-                  wordWrap: "break-word",
-                  maxWidth: "200px",
-                }}
-              >
+              <Typography sx={getTypographyStyles("title")}>
                 Terminal
               </Typography>
             </StyledHeaderCell>
             {addTimestamp && (
               <StyledHeaderCell settings={settings}>
-                <Typography
-                  sx={{
-                    color: settings.titleColor,
-                    fontFamily: settings.titleFontFamily,
-                    fontSize: settings.titleFontSize,
-                    fontStyle: settings.titleFontStyle,
-                    fontWeight: settings.titleFontWeight,
-                    textDecoration: settings.titleTextDecoration,
-                    wordWrap: "break-word",
-                    maxWidth: "200px",
-                  }}
-                >
+                <Typography sx={getTypographyStyles("title")}>
                   Timestamp
                 </Typography>
               </StyledHeaderCell>
@@ -484,22 +479,11 @@ const DashboardDataGridWidget = ({
                     handleMeasurementChange,
                     i
                   ) || (
-                    <Typography
-                      sx={{
-                        color: settings.titleColor,
-                        fontFamily: settings.titleFontFamily,
-                        fontSize: settings.titleFontSize,
-                        fontStyle: settings.titleFontStyle,
-                        fontWeight: settings.titleFontWeight,
-                        textDecoration: settings.titleTextDecoration,
-                        wordWrap: "break-word",
-                        maxWidth: "200px",
-                      }}
-                    >
+                    <Typography sx={getTypographyStyles("title")}>
                       {selectedMeasurements[i]
-                        ? `${selectedMeasurements[i]} (${
-                            gridData?.[0]?.[i]?.unit || ""
-                          })`
+                        ? gridData?.[0]?.[i]?.unit
+                          ? `${selectedMeasurements[i]} (${gridData[0][i].unit})`
+                          : selectedMeasurements[i]
                         : "--"}
                     </Typography>
                   )}
@@ -520,54 +504,21 @@ const DashboardDataGridWidget = ({
                     handleTerminalChange,
                     rowIdx
                   ) || (
-                    <Typography
-                      sx={{
-                        color: settings.titleColor,
-                        fontFamily: settings.titleFontFamily,
-                        fontSize: settings.titleFontSize,
-                        fontStyle: settings.titleFontStyle,
-                        fontWeight: settings.titleFontWeight,
-                        textDecoration: settings.titleTextDecoration,
-                        wordWrap: "break-word",
-                        maxWidth: "200px",
-                      }}
-                    >
+                    <Typography sx={getTypographyStyles("title")}>
                       {selectedTerminals[rowIdx] || "--"}
                     </Typography>
                   )}
                 </StyledTableCell>
                 {addTimestamp && (
                   <StyledTableCell settings={settings}>
-                    <Typography
-                      sx={{
-                        color: settings.valueColor,
-                        fontFamily: settings.valueFontFamily,
-                        fontSize: settings.valueFontSize,
-                        fontStyle: settings.valueFontStyle,
-                        fontWeight: settings.valueFontWeight,
-                        textDecoration: settings.valueTextDecoration,
-                        wordWrap: "break-word",
-                        maxWidth: "200px",
-                      }}
-                    >
+                    <Typography sx={getTypographyStyles("value")}>
                       {formatTimestamp(gridData[rowIdx]?.[0]?.timestamp)}
                     </Typography>
                   </StyledTableCell>
                 )}
                 {gridData[rowIdx]?.map((cell, colIdx) => (
                   <StyledTableCell key={colIdx} settings={settings}>
-                    <Typography
-                      sx={{
-                        color: settings.valueColor,
-                        fontFamily: settings.valueFontFamily,
-                        fontSize: settings.valueFontSize,
-                        fontStyle: settings.valueFontStyle,
-                        fontWeight: settings.valueFontWeight,
-                        textDecoration: settings.valueTextDecoration,
-                        wordWrap: "break-word",
-                        maxWidth: "200px",
-                      }}
-                    >
+                    <Typography sx={getTypographyStyles("value")}>
                       {cell.value !== "--" ? `${cell.value.toFixed(2)}` : "--"}
                     </Typography>
                   </StyledTableCell>

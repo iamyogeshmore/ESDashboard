@@ -43,7 +43,6 @@ import { styled } from "@mui/material/styles";
 import "chartjs-adapter-date-fns";
 import DeleteConfirmationDialog from "../DeleteConfirmationDialog";
 
-// ------------------ Register ChartJS components ------------------
 ChartJS.register(
   LineElement,
   PointElement,
@@ -55,30 +54,8 @@ ChartJS.register(
   Filler
 );
 
-// --------------- Base API endpoint from environment variables ---------------
 const API_BASE_URL = `${process.env.REACT_APP_API_LOCAL_URL}api`;
 
-// ------------------ Default widget settings ------------------
-const customDefaultWidgetSettings = {
-  backgroundColor: "#cff7ba",
-  borderColor: "#417505",
-  borderRadius: "3px",
-  borderWidth: "1px",
-  titleColor: "#000000",
-  titleFontFamily: "Georgia",
-  titleFontSize: "14px",
-  titleFontStyle: "normal",
-  titleFontWeight: "normal",
-  titleTextDecoration: "none",
-  valueColor: "#d0021b",
-  valueFontFamily: "Arial",
-  valueFontSize: "24px",
-  valueFontStyle: "normal",
-  valueFontWeight: "bold",
-  valueTextDecoration: "none",
-};
-
-// ------------------ Predefined color options ------------------
 const colorOptions = [
   { name: "Teal", value: "rgba(0, 128, 128, 1)", bg: "rgba(0, 128, 128, 0.2)" },
   {
@@ -102,42 +79,48 @@ const colorOptions = [
   { name: "Cyan", value: "rgba(0, 255, 255, 1)", bg: "rgba(0, 255, 255, 0.2)" },
 ];
 
-// ------------------ Styled components ------------------
-const GraphPaper = styled(Paper)(({ theme, isDarkMode, isFullscreen }) => ({
-  height: isFullscreen ? "100vh" : "100%",
-  width: isFullscreen ? "100vw" : "100%",
-  padding: theme.spacing(2),
-  background: isDarkMode
-    ? "linear-gradient(145deg, #2a2a2a 0%, #1f1f1f 100%)"
-    : customDefaultWidgetSettings.backgroundColor,
-  borderRadius: isFullscreen ? 0 : customDefaultWidgetSettings.borderRadius,
-  border: `${customDefaultWidgetSettings.borderWidth} solid ${customDefaultWidgetSettings.borderColor}`,
-  boxShadow: isDarkMode
-    ? "0 4px 20px rgba(0, 0, 0, 0.5)"
-    : "0 4px 20px rgba(0, 0, 0, 0.05)",
-  transition: "all 0.3s ease",
-  "&:hover": !isFullscreen && {
-    transform: "translateY(-2px)",
+const GraphPaper = styled(Paper)(
+  ({ theme, isDarkMode, isFullscreen, settings }) => ({
+    height: isFullscreen ? "100vh" : "100%",
+    width: isFullscreen ? "100vw" : "100%",
+    padding: theme.spacing(2),
+    background:
+      settings?.backgroundColor ||
+      (isDarkMode
+        ? "linear-gradient(145deg, #2a2a2a 0%, #1f1f1f 100%)"
+        : "#ffffff"),
+    borderRadius: isFullscreen ? 0 : settings?.borderRadius || "3px",
+    border: `${settings?.borderWidth || "1px"} solid ${
+      settings?.borderColor || "#e0e0e0"
+    }`,
     boxShadow: isDarkMode
-      ? "0 6px 24px rgba(0, 0, 0, 0.6)"
-      : "0 6px 24px rgba(0, 0, 0, 0.1)",
-  },
-  display: "flex",
-  flexDirection: "column",
-  position: isFullscreen ? "fixed" : "relative",
-  top: isFullscreen ? 0 : "auto",
-  left: isFullscreen ? 0 : "auto",
-  zIndex: isFullscreen ? 1300 : "auto",
-  overflow: "hidden",
-}));
+      ? "0 4px 20px rgba(0, 0, 0, 0.5)"
+      : "0 4px 20px rgba(0, 0, 0, 0.05)",
+    transition: "all 0.3s ease",
+    "&:hover": !isFullscreen && {
+      transform: "translateY(-2px)",
+      boxShadow: isDarkMode
+        ? "0 6px 24px rgba(0, 0, 0, 0.6)"
+        : "0 6px 24px rgba(0, 0, 0, 0.1)",
+    },
+    display: "flex",
+    flexDirection: "column",
+    position: isFullscreen ? "fixed" : "relative",
+    top: isFullscreen ? 0 : "auto",
+    left: isFullscreen ? 0 : "auto",
+    zIndex: isFullscreen ? 1300 : "auto",
+    overflow: "hidden",
+  })
+);
 
-const WidgetHeader = styled(Box)(({ theme, isDarkMode }) => ({
+const WidgetHeader = styled(Box)(({ theme, isDarkMode, settings }) => ({
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
   paddingBottom: theme.spacing(1),
   borderBottom: `1px solid ${isDarkMode ? "#6b7280" : "#e5e7eb"}`,
   cursor: "move",
+  color: settings?.titleColor || "#000000",
 }));
 
 const ControlButtons = styled(Box)(({ theme }) => ({
@@ -188,7 +171,6 @@ const ApplyButton = styled(Button)(({ theme, isDarkMode }) => ({
   },
 }));
 
-// ------------------ Utility function to format timestamp ------------------
 const formatTimestamp = (timestamp) => {
   if (!timestamp) return "";
   const date = new Date(timestamp);
@@ -203,12 +185,10 @@ const formatTimestamp = (timestamp) => {
   });
 };
 
-// ------------------ Custom tooltip positioner ------------------
 Tooltip.positioners.custom = function (elements, eventPosition) {
   return { x: eventPosition.x, y: eventPosition.y - 20 };
 };
 
-// ------------------ Crosshair plugin for tooltip ------------------
 const tooltipCrosshairPlugin = {
   id: "tooltipCrosshair",
   afterDraw: (chart) => {
@@ -240,7 +220,6 @@ const tooltipCrosshairPlugin = {
   },
 };
 
-// ------------------ Main DashboardGraphWidget component ------------------
 const DashboardGraphWidget = ({
   data,
   width,
@@ -260,6 +239,11 @@ const DashboardGraphWidget = ({
   const [measurand, setMeasurand] = useState("");
   const [color, setColor] = useState(colorOptions[0].name);
   const [customColor, setCustomColor] = useState("#000000");
+  const [availableMeasurands, setAvailableMeasurands] = useState([]);
+  const [terminalDetails, setTerminalDetails] = useState({
+    plantId: null,
+    terminalId: null,
+  });
   const chartInstanceRef = useRef(null);
   const widgetRef = useRef(null);
   const [anchorEl, setAnchorEl] = useState(null);
@@ -267,28 +251,111 @@ const DashboardGraphWidget = ({
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarSeverity, setSnackbarSeverity] = useState("success");
+  const settings = data.settings || {};
 
-  // ------------------ Fetch graph data from API ------------------
+  useEffect(() => {
+    const widgetSettings = localStorage.getItem(`widgetSettings_${data.id}`);
+    if (widgetSettings) {
+      try {
+        // Settings are applied via WidgetProperties, no need to set here
+      } catch (error) {
+        console.error(`Error parsing settings for widget ${data.id}:`, error);
+      }
+    }
+  }, [data.id]);
+
+  const fetchTerminalDetails = async (terminalName) => {
+    try {
+      if (!terminalName)
+        throw new Error("Terminal name is required to fetch details");
+      const plantsResponse = await axios.get(`${API_BASE_URL}/hdd/plants`);
+      const plants = plantsResponse.data.data;
+      for (const plant of plants) {
+        const terminalsResponse = await axios.get(
+          `${API_BASE_URL}/hdd/terminals/${plant.plantId}`
+        );
+        const terminal = terminalsResponse.data.data.find(
+          (t) => t.terminalName === terminalName
+        );
+        if (terminal)
+          return { plantId: plant.plantId, terminalId: terminal.terminalId };
+      }
+      throw new Error(`Terminal ${terminalName} not found in any plant`);
+    } catch (error) {
+      console.error("Error fetching terminal details:", error);
+      setSnackbarMessage(
+        `Failed to resolve terminal details for ${terminalName}`
+      );
+      setSnackbarSeverity("error");
+      setSnackbarOpen(true);
+      return null;
+    }
+  };
+
+  const fetchAvailableMeasurands = async (plantId, terminalId) => {
+    try {
+      if (!plantId || !terminalId)
+        throw new Error("PlantId and TerminalId are required");
+      const response = await axios.get(
+        `${API_BASE_URL}/hdd/measurands/${plantId}/${terminalId}`
+      );
+      const measurands = response.data.data.map((item) => ({
+        MeasurandId: item.measurandId,
+        MeasurandName: item.measurandName,
+      }));
+      setAvailableMeasurands(measurands);
+    } catch (error) {
+      console.error("Error fetching measurands:", error);
+      setSnackbarMessage("Failed to fetch measurands for comparison");
+      setSnackbarSeverity("error");
+      setSnackbarOpen(true);
+      setAvailableMeasurands(data.measurands || []);
+    }
+  };
+
+  useEffect(() => {
+    const resolveTerminalDetails = async () => {
+      if (data.plantId && data.terminalId) {
+        setTerminalDetails({
+          plantId: data.plantId,
+          terminalId: data.terminalId,
+        });
+        fetchAvailableMeasurands(data.plantId, data.terminalId);
+      } else if (data.terminal) {
+        const details = await fetchTerminalDetails(data.terminal);
+        if (details) {
+          setTerminalDetails(details);
+          fetchAvailableMeasurands(details.plantId, details.terminalId);
+        }
+      }
+    };
+    resolveTerminalDetails();
+  }, [data.terminal, data.plantId, data.terminalId]);
+
   const fetchGraphData = async (measurandName) => {
     try {
-      const { plant, terminal } = data;
-      if (!plant || !terminal || !measurandName) {
-        throw new Error("Missing required widget configuration");
-      }
+      const { terminal } = data;
+      if (!terminal || !measurandName)
+        throw new Error("Missing terminal or measurand");
       const response = await axios.get(
-        `${API_BASE_URL}/hdd/graph/${plant}/${terminal}/${measurandName}`
+        `${API_BASE_URL}/hdd/graph/${terminal}/${measurandName}`
       );
-      return response.data.data.map((item) => ({
-        timestamp: item.Timestamp,
-        value: parseFloat(item.MeasurandValue),
-      }));
+      const fetchedData = response.data.data
+        .map((item) => ({
+          timestamp: item.Timestamp,
+          value: parseFloat(item.MeasurandValue),
+        }))
+        .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+      return fetchedData;
     } catch (error) {
       console.error(`Error fetching graph data for ${measurandName}:`, error);
+      setSnackbarMessage(`Failed to fetch data for ${measurandName}`);
+      setSnackbarSeverity("error");
+      setSnackbarOpen(true);
       return [];
     }
   };
 
-  // ------------------ Fetch data periodically ------------------
   useEffect(() => {
     let isMounted = true;
     const fetchData = async () => {
@@ -303,15 +370,14 @@ const DashboardGraphWidget = ({
     };
     if (selectedMeasurands.length > 0) {
       fetchData();
-      const interval = setInterval(fetchData, 5000); // Reduced to 5s like GraphWidget
+      const interval = setInterval(fetchData, 1000);
       return () => {
         isMounted = false;
         clearInterval(interval);
       };
     }
-  }, [selectedMeasurands, data.plant, data.terminal]);
+  }, [selectedMeasurands, data.terminal]);
 
-  // ------------------ Cleanup chart instance ------------------
   useEffect(() => {
     return () => {
       if (chartInstanceRef.current) {
@@ -321,7 +387,6 @@ const DashboardGraphWidget = ({
     };
   }, []);
 
-  // ------------------ Handle fullscreen changes ------------------
   useEffect(() => {
     const handleFullscreenChange = () => {
       if (!document.fullscreenElement && isFullscreen) setIsFullscreen(false);
@@ -331,7 +396,6 @@ const DashboardGraphWidget = ({
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
   }, [isFullscreen]);
 
-  // ------------------ Chart data configuration ------------------
   const chartData = {
     labels:
       selectedMeasurands.length > 0 && graphData[selectedMeasurands[0].name]
@@ -340,16 +404,16 @@ const DashboardGraphWidget = ({
           )
         : [],
     datasets: selectedMeasurands.map((measurand) => {
-      const data = (graphData[measurand.name] || []).map((d) => d.value);
-      const pointRadius = data.map((_, index) =>
-        index === data.length - 1 ? 5 : 0
+      const dataPoints = (graphData[measurand.name] || []).map((d) => d.value);
+      const pointRadius = dataPoints.map((_, index) =>
+        index === dataPoints.length - 1 ? 5 : 0
       );
-      const pointBackgroundColor = data.map((_, index) =>
-        index === data.length - 1 ? "red" : measurand.color.value
+      const pointBackgroundColor = dataPoints.map((_, index) =>
+        index === dataPoints.length - 1 ? "red" : measurand.color.value
       );
       return {
         label: measurand.name,
-        data,
+        data: dataPoints,
         backgroundColor: measurand.color.bg,
         borderColor: measurand.color.value,
         fill: true,
@@ -362,7 +426,6 @@ const DashboardGraphWidget = ({
     }),
   };
 
-  // ------------------ Chart options with blinking effect ------------------
   const options = {
     responsive: true,
     maintainAspectRatio: false,
@@ -458,7 +521,6 @@ const DashboardGraphWidget = ({
 
   ChartJS.register(tooltipCrosshairPlugin);
 
-  // ------------------ Handlers for UI interactions ------------------
   const handleSidebarToggle = () => setSidebarOpen(!sidebarOpen);
   const handleSidebarClose = () => setSidebarOpen(false);
   const handleMeasurandChange = (event) => setMeasurand(event.target.value);
@@ -513,32 +575,30 @@ const DashboardGraphWidget = ({
 
   const toggleFullscreen = () => {
     if (!isFullscreen) {
-      widgetRef.current
-        .requestFullscreen()
-        .then(() => setIsFullscreen(true))
-        .catch((err) => console.error("Fullscreen error:", err));
+      widgetRef.current.requestFullscreen().then(() => setIsFullscreen(true));
     } else {
-      document
-        .exitFullscreen()
-        .then(() => setIsFullscreen(false))
-        .catch((err) => console.error("Exit fullscreen error:", err));
+      document.exitFullscreen().then(() => setIsFullscreen(false));
     }
   };
 
   const handleMenuClick = (event) => setAnchorEl(event.currentTarget);
   const handleMenuClose = () => setAnchorEl(null);
 
-  // ------------------ Render function ------------------
   return (
     <GraphPaper
       ref={widgetRef}
       elevation={2}
       isDarkMode={isDarkMode}
       isFullscreen={isFullscreen}
+      settings={settings}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <WidgetHeader isDarkMode={isDarkMode} className="widget-header">
+      <WidgetHeader
+        isDarkMode={isDarkMode}
+        settings={settings}
+        className="widget-header"
+      >
         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
           <DragHandle
             sx={{
@@ -549,12 +609,12 @@ const DashboardGraphWidget = ({
           <Typography
             variant="h6"
             sx={{
-              color: customDefaultWidgetSettings.titleColor,
-              fontWeight: customDefaultWidgetSettings.titleFontWeight,
-              fontFamily: customDefaultWidgetSettings.titleFontFamily,
-              fontSize: customDefaultWidgetSettings.titleFontSize,
-              fontStyle: customDefaultWidgetSettings.titleFontStyle,
-              textDecoration: customDefaultWidgetSettings.titleTextDecoration,
+              color: settings.titleColor || "#000000",
+              fontFamily: settings.titleFontFamily || "inherit",
+              fontSize: settings.titleFontSize || "14px",
+              fontStyle: settings.titleFontStyle || "normal",
+              fontWeight: settings.titleFontWeight || "normal",
+              textDecoration: settings.titleTextDecoration || "none",
             }}
           >
             {data.name || "Graph Widget"}
@@ -717,17 +777,15 @@ const DashboardGraphWidget = ({
               <MenuItem value="">
                 <em>Select Measurand</em>
               </MenuItem>
-              {data.measurands &&
-                Array.isArray(data.measurands) &&
-                data.measurands.map((m) => (
-                  <MenuItem
-                    key={m.MeasurandName}
-                    value={m.MeasurandName}
-                    sx={{ fontFamily: "Inter" }}
-                  >
-                    {m.MeasurandName}
-                  </MenuItem>
-                ))}
+              {availableMeasurands.map((m) => (
+                <MenuItem
+                  key={m.MeasurandId}
+                  value={m.MeasurandName}
+                  sx={{ fontFamily: "Inter" }}
+                >
+                  {m.MeasurandName}
+                </MenuItem>
+              ))}
             </Select>
           </FormControl>
           <FormControl fullWidth sx={{ mb: 2 }}>

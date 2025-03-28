@@ -1,26 +1,7 @@
 import React from "react";
-import { Box, Card, CardContent, Typography } from "@mui/material";
+import { Card, CardContent, Typography } from "@mui/material";
 import { styled } from "@mui/material/styles";
 
-const customDefaultWidgetSettings = {
-  backgroundColor: "#cff7ba",
-  borderColor: "#417505",
-  borderRadius: "3px",
-  borderWidth: "1px",
-  titleColor: "#000000",
-  titleFontFamily: "Georgia",
-  titleFontSize: "14px",
-  titleFontStyle: "normal",
-  titleFontWeight: "normal",
-  titleTextDecoration: "none",
-  valueColor: "#d0021b",
-  valueFontFamily: "Arial",
-  valueFontSize: "24px",
-  valueFontStyle: "normal",
-  valueFontWeight: "bold",
-  valueTextDecoration: "none",
-};
-// ------------- Styled component for the card with custom settings ------------------
 const StyledCard = styled(Card)(({ theme, settings }) => ({
   transition: "all 0.3s",
   background: settings?.backgroundColor || theme.palette.background.paper,
@@ -28,11 +9,13 @@ const StyledCard = styled(Card)(({ theme, settings }) => ({
     settings?.borderColor || "#e0e0e0"
   }`,
   borderRadius: settings?.borderRadius || "8px",
+  height: "100%",
+  display: "flex",
+  flexDirection: "column",
 }));
 
 const DashboardTextWidget = ({ data, width, height }) => {
-  const { textContent, settings: providedSettings = {} } = data || {};
-  const settings = { ...customDefaultWidgetSettings, ...providedSettings };
+  const { textContent, settings = {} } = data || {};
 
   return (
     <StyledCard
@@ -40,33 +23,29 @@ const DashboardTextWidget = ({ data, width, height }) => {
       settings={settings}
       sx={{ width: "100%", height: "100%" }}
     >
-      <CardContent>
-        <Box
+      <CardContent
+        sx={{
+          flexGrow: 1,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 2,
+        }}
+      >
+        <Typography
           sx={{
-            flexGrow: 1,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            overflow: "auto",
+            color: settings.titleColor || "#000000",
+            fontFamily: settings.titleFontFamily || "inherit",
+            fontSize: settings.titleFontSize || "14px",
+            fontWeight: settings.titleFontWeight || "normal",
+            fontStyle: settings.titleFontStyle || "normal",
+            textDecoration: settings.titleTextDecoration || "none",
+            wordBreak: "break-word",
+            textAlign: "center",
           }}
         >
-          <Typography
-            sx={{
-              color: settings.titleColor,
-              fontFamily: settings.titleFontFamily,
-              fontSize: settings.titleFontSize,
-              fontWeight: settings.titleFontWeight,
-              fontStyle: settings.titleFontStyle,
-              textDecoration: settings.titleTextDecoration,
-              wordBreak: "break-word",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {textContent || "No text provided"}
-          </Typography>
-        </Box>
+          {textContent || "No text provided"}
+        </Typography>
       </CardContent>
     </StyledCard>
   );

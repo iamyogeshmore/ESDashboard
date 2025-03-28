@@ -11,7 +11,9 @@ import Dashboard from "./pages/Dashboard";
 import TerminalView from "./pages/TerminalView";
 import MeasurandView from "./pages/MeasurandView";
 import TableDetailsPage from "./pages/TableDetailsPage";
+import Viewer from "./pages/DashboardViewer"; // Import the new Viewer page
 import axios from "axios";
+import { preserveWidgetTemplatesAndClear } from "./components/localStorageUtils";
 
 const API_BASE_URL = `${process.env.REACT_APP_API_LOCAL_URL}api`;
 
@@ -34,8 +36,7 @@ const App = () => {
     setWidgets([]);
     setDashboardName("");
     setActiveDashboard("");
-    localStorage.removeItem("dashboardWidgets");
-    localStorage.removeItem("defaultDashboard");
+    preserveWidgetTemplatesAndClear();
   };
 
   const handleDashboardSelect = async (name, widgets) => {
@@ -53,7 +54,6 @@ const App = () => {
     }
   };
 
-  // Optional debugging
   useEffect(() => {
     console.log("App.js state changed:", {
       widgets,
@@ -107,6 +107,8 @@ const App = () => {
             <Route path="/terminal-view" element={<TerminalView />} />
             <Route path="/hdd/table/:tableId" element={<TableDetailsPage />} />
             <Route path="/measurand-view" element={<MeasurandView />} />
+            <Route path="/viewer" element={<Viewer />} />{" "}
+            {/* New Viewer Route */}
           </Routes>
         </Box>
         <Footer />

@@ -8,6 +8,7 @@ import {
   TextField,
 } from "@mui/material";
 
+// --------------------------- Function renders a dialog for saving the dashboard with a name -------------------------------
 const SaveDashboardDialog = ({
   open,
   onClose,
@@ -15,9 +16,9 @@ const SaveDashboardDialog = ({
   setDashboardName,
   handleSaveDashboard,
 }) => (
-  // ------------------ Dialog container -------------
   <Dialog open={open} onClose={onClose}>
     <DialogTitle>Save Dashboard</DialogTitle>
+    {/* --------------------------- Section for dialog content with input field ------------------------------- */}
     <DialogContent>
       <TextField
         autoFocus
@@ -28,8 +29,7 @@ const SaveDashboardDialog = ({
         onChange={(e) => setDashboardName(e.target.value)}
       />
     </DialogContent>
-
-    {/* ------------------ Dialog actions area ------------- */}
+    {/* --------------------------- Section for dialog actions with buttons ------------------------------- */}
     <DialogActions>
       <Button onClick={onClose}>Cancel</Button>
       <Button onClick={handleSaveDashboard} variant="contained">

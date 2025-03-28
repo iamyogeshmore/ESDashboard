@@ -18,24 +18,40 @@ import {
 } from "@mui/icons-material";
 import DeleteConfirmationDialog from "../DeleteConfirmationDialog";
 
-const defaultWidgetSettings = {
-  backgroundColor: "#cff7ba",
-  borderColor: "#417505",
+const formatTimestamp = (timestamp) => {
+  if (!timestamp) return "No timestamp available";
+  const date = new Date(timestamp);
+  return date.toLocaleString("en-US", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false, 
+    timeZone: "UTC",
+  });
+};
+
+// Custom default widget settings from WidgetProperties
+const customDefaultWidgetSettings = {
+  backgroundColor: "#000000",
+  borderColor: "#ffffff",
   borderRadius: "3px",
   borderWidth: "1px",
-  titleColor: "#000000",
-  titleFontFamily: "Georgia",
+  titleColor: "#ffffff",
+  titleFontFamily: "Arial",
   titleFontSize: "24px",
   titleFontStyle: "normal",
   titleFontWeight: "normal",
   titleTextDecoration: "none",
-  valueColor: "#d0021b",
+  valueColor: "#e0e0e0",
   valueFontFamily: "Arial",
   valueFontSize: "24px",
   valueFontStyle: "normal",
-  valueFontWeight: "bold",
+  valueFontWeight: "normal",
   valueTextDecoration: "none",
-  widgetName: "Default Widget",
+  widgetName: "Custom Widget",
 };
 
 const NumberWidget = ({
@@ -57,14 +73,14 @@ const NumberWidget = ({
   const [error, setError] = useState(null);
   const [anchorEl, setAnchorEl] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const menuButtonRef = useRef(null); // Ref to manage focus
+  const menuButtonRef = useRef(null);
 
   const styles = useMemo(() => {
     const storedSettings = widgetId
       ? localStorage.getItem(`widgetSettings_${widgetId}`)
       : null;
     const baseStyles = {
-      ...defaultWidgetSettings,
+      ...customDefaultWidgetSettings,
       ...(storedSettings ? JSON.parse(storedSettings) : {}),
       ...initialProperties,
     };
@@ -120,14 +136,11 @@ const NumberWidget = ({
     externalValue !== undefined ? externalValue : internalValue;
   const displayTimestamp =
     externalTimestamp !== undefined ? externalTimestamp : internalTimestamp;
-  const tooltipTitle = displayTimestamp
-    ? `Last updated: ${displayTimestamp}`
-    : "No timestamp available";
+  const tooltipTitle = `Last sync: ${formatTimestamp(displayTimestamp)}`;
 
   const handleMenuClick = (event) => setAnchorEl(event.currentTarget);
   const handleMenuClose = () => {
     setAnchorEl(null);
-    // Return focus to the menu button when the menu closes
     menuButtonRef.current?.focus();
   };
   const handleDeleteClick = () => {
@@ -208,7 +221,7 @@ const NumberWidget = ({
             >
               <IconButton
                 onClick={handleMenuClick}
-                ref={menuButtonRef} // Attach ref to the button
+                ref={menuButtonRef}
                 sx={{
                   bgcolor: isDarkMode
                     ? "rgba(66,66,66,0.8)"
@@ -294,7 +307,7 @@ const NumberWidget = ({
               ? "Error"
               : displayValue !== null && displayValue !== undefined
               ? displayValue.toFixed(styles.decimalPlaces || 2)
-              : "Loading..."}
+              : ""}
           </Typography>
         </Box>
 

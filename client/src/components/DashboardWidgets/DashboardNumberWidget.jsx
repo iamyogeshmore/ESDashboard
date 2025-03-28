@@ -1,39 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { Box, Typography, Paper, Tooltip } from "@mui/material";
 import axios from "axios";
+import { formatTimestamp } from "./formatTimestamp";
 
 const API_BASE_URL = `${process.env.REACT_APP_API_LOCAL_URL}api`;
-
-const customDefaultWidgetSettings = {
-  backgroundColor: "#cff7ba",
-  borderColor: "#417505",
-  borderRadius: "3px",
-  borderWidth: "1px",
-  titleColor: "#000000",
-  titleFontFamily: "Georgia",
-  titleFontSize: "14px",
-  titleFontStyle: "normal",
-  titleFontWeight: "normal",
-  titleTextDecoration: "none",
-  valueColor: "#d0021b",
-  valueFontFamily: "Arial",
-  valueFontSize: "24px",
-  valueFontStyle: "normal",
-  valueFontWeight: "bold",
-  valueTextDecoration: "none",
-};
-
-// Simply return the raw timestamp as received from API
-const formatTimestamp = (timestamp) => {
-  return timestamp || "No timestamp available";
-};
 
 const DashboardNumberWidget = ({ data, width, height }) => {
   const [value, setValue] = useState(null);
   const [timestamp, setTimestamp] = useState(null);
-  const [unit, setUnit] = useState(data.unit || ""); // Initialize with data.unit or empty
   const [isHovered, setIsHovered] = useState(false);
-  const settings = { ...customDefaultWidgetSettings, ...(data.settings || {}) };
+  const settings = data.settings || {};
 
   useEffect(() => {
     const fetchData = async () => {
@@ -44,12 +20,10 @@ const DashboardNumberWidget = ({ data, width, height }) => {
         const latestData = response.data[response.data.length - 1];
         setValue(parseFloat(latestData.MeasurandValue) || 0);
         setTimestamp(latestData.TimeStamp);
-        setUnit(latestData.Unit || data.unit || ""); // Fallback to API unit
       } catch (error) {
         console.error("Error fetching measurement data:", error);
         setValue(0);
         setTimestamp(null);
-        setUnit(data.unit || ""); // Reset to data.unit or empty on error
       }
     };
 
@@ -71,11 +45,12 @@ const DashboardNumberWidget = ({ data, width, height }) => {
           minWidth: "150px",
           p: 2,
           textAlign: "center",
-          bgcolor: settings.backgroundColor,
-          borderRadius: settings.borderRadius,
-          border: `${settings.borderWidth} solid ${settings.borderColor}`,
+          bgcolor: settings.backgroundColor || "#ffffff",
+          borderRadius: settings.borderRadius || "3px",
+          border: `${settings.borderWidth || "1px"} solid ${
+            settings.borderColor || "#e0e0e0"
+          }`,
           transition: "transform 0.2s",
-          "&:hover": { transform: "scale(1.02)" },
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
@@ -88,12 +63,12 @@ const DashboardNumberWidget = ({ data, width, height }) => {
         <Typography
           variant="subtitle2"
           sx={{
-            color: settings.titleColor,
-            fontFamily: settings.titleFontFamily,
-            fontSize: settings.titleFontSize,
-            fontWeight: settings.titleFontWeight,
-            fontStyle: settings.titleFontStyle,
-            textDecoration: settings.titleTextDecoration,
+            color: settings.titleColor || "#000000",
+            fontFamily: settings.titleFontFamily || "inherit",
+            fontSize: settings.titleFontSize || "14px",
+            fontWeight: settings.titleFontWeight || "normal",
+            fontStyle: settings.titleFontStyle || "normal",
+            textDecoration: settings.titleTextDecoration || "none",
             wordBreak: "break-word",
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -138,12 +113,12 @@ const DashboardNumberWidget = ({ data, width, height }) => {
         >
           <Typography
             sx={{
-              color: settings.valueColor,
-              fontFamily: settings.valueFontFamily,
-              fontWeight: settings.valueFontWeight,
-              fontStyle: settings.valueFontStyle,
-              textDecoration: settings.valueTextDecoration,
-              fontSize: settings.valueFontSize,
+              color: settings.valueColor || "#000000",
+              fontFamily: settings.valueFontFamily || "inherit",
+              fontWeight: settings.valueFontWeight || "normal",
+              fontStyle: settings.valueFontStyle || "normal",
+              textDecoration: settings.valueTextDecoration || "none",
+              fontSize: settings.valueFontSize || "24px",
               wordBreak: "break-word",
               overflow: "hidden",
               textOverflow: "ellipsis",
@@ -153,15 +128,19 @@ const DashboardNumberWidget = ({ data, width, height }) => {
           >
             {value !== null ? value.toFixed(data.decimals || 2) : "Loading..."}
           </Typography>
-          {unit && (
+          {data.unit && (
             <Typography
               sx={{
+                color: settings.titleColor || "#000000",
+                fontFamily: settings.titleFontFamily || "inherit",
+                fontSize: settings.titleFontSize || "14px",
+                fontWeight: settings.titleFontWeight || "normal",
+                fontStyle: settings.titleFontStyle || "normal",
+                textDecoration: settings.titleTextDecoration || "none",
                 ml: 1,
-                color: "text.secondary",
-                fontSize: "clamp(10px, 2vw, 16px)",
               }}
             >
-              {unit} {/* Display API-provided unit */}
+              {data.unit}
             </Typography>
           )}
         </Box>

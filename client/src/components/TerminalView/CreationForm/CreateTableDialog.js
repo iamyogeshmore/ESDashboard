@@ -22,11 +22,13 @@ import {
   CircularProgress,
 } from "@mui/material";
 
-// ------------- Base API endpoint from environment variables ------------------
-const API_BASE_URL = `${process.env.REACT_APP_API_LOCAL_URL}api`;
+const API_BASE_URL = `${process.env.REACT_APP_API_LOCAL_URL}api/hdd`;
 
 const CreateTableDialog = ({ open, onClose, onCreate }) => {
   const [newTable, setNewTable] = useState({
+    plantId: "",
+    terminalId: "",
+    measurandIds: [],
     plantName: "",
     terminalName: "",
     measurandNames: [],
@@ -41,96 +43,139 @@ const CreateTableDialog = ({ open, onClose, onCreate }) => {
   });
   const [error, setError] = useState(null);
 
-  // ------------- Fetches plant ------------------
   useEffect(() => {
     if (open) {
       const fetchPlants = async () => {
         setLoading((prev) => ({ ...prev, plants: true }));
         try {
           const response = await axios.get(`${API_BASE_URL}/plants`);
-          setPlantOptions(response.data);
+          if (!response.data.success) throw new Error(response.data.message);
+          setPlantOptions(response.data.data);
           setError(null);
         } catch (error) {
           console.error("Error fetching plants:", error);
-          setError("Failed to fetch plants");
+          setError(error.message || "Failed to fetch plants");
         } finally {
           setLoading((prev) => ({ ...prev, plants: false }));
         }
       };
-
       fetchPlants();
     }
   }, [open]);
 
-  // ------------- Handles changes to table fields and fetches related data ------------------
   const handleNewTableChange = (field) => async (event) => {
     const value = event.target.value;
-    setNewTable((prev) => ({ ...prev, [field]: value }));
 
-    if (field === "plantName") {
-      setLoading((prev) => ({ ...prev, terminals: true }));
-      try {
-        const response = await axios.get(`${API_BASE_URL}/terminals/${value}`);
-        setTerminalOptions(response.data);
-        setNewTable((prev) => ({
-          ...prev,
-          [field]: value,
-          terminalName: "",
-          measurandNames: [],
-        }));
-        setMeasurandOptions([]);
-        setError(null);
-      } catch (error) {
-        console.error("Error fetching terminals:", error);
-        setError("Failed to fetch terminals");
-      } finally {
-        setLoading((prev) => ({ ...prev, terminals: false }));
+    if (field === "plantId") {
+      const selectedPlant = plantOptions.find((p) => p.plantId === value);
+      setNewTable((prev) => ({
+        ...prev,
+        plantId: value,
+        plantName: selectedPlant?.plantName || "",
+        terminalId: "",
+        terminalName: "",
+        measurandIds: [],
+        measurandNames: [],
+      }));
+      setTerminalOptions([]);
+      setMeasurandOptions([]);
+
+      if (value) {
+        setLoading((prev) => ({ ...prev, terminals: true }));
+        try {
+          const response = await axios.get(
+            `${API_BASE_URL}/terminals/${value}`
+          );
+          if (!response.data.success) throw new Error(response.data.message);
+          setTerminalOptions(response.data.data);
+          setError(null);
+        } catch (error) {
+          console.error("Error fetching terminals:", error);
+          setError(error.message || "Failed to fetch terminals");
+          setTerminalOptions([]);
+        } finally {
+          setLoading((prev) => ({ ...prev, terminals: false }));
+        }
       }
-    } else if (field === "terminalName") {
-      setLoading((prev) => ({ ...prev, measurands: true }));
-      try {
-        const response = await axios.get(
-          `${API_BASE_URL}/measurands/${newTable.plantName}/${value}`
-        );
-        setMeasurandOptions(response.data);
-        setNewTable((prev) => ({
-          ...prev,
-          [field]: value,
-          measurandNames: [],
-        }));
-        setError(null);
-      } catch (error) {
-        console.error("Error fetching measurands:", error);
-        setError("Failed to fetch measurands");
-      } finally {
-        setLoading((prev) => ({ ...prev, measurands: false }));
+    } else if (field === "terminalId") {
+      const selectedTerminal = terminalOptions.find(
+        (t) => t.terminalId === value
+      );
+      setNewTable((prev) => ({
+        ...prev,
+        terminalId: value,
+        terminalName: selectedTerminal?.terminalName || "",
+        measurandIds: [],
+        measurandNames: [],
+      }));
+      setMeasurandOptions([]);
+
+      if (value && newTable.plantId) {
+        setLoading((prev) => ({ ...prev, measurands: true }));
+        try {
+          const response = await axios.get(
+            `${API_BASE_URL}/measurands/${newTable.plantId}/${value}`
+          );
+          if (!response.data.success) throw new Error(response.data.message);
+          setMeasurandOptions(response.data.data); // Now expects all measurands
+          setError(null);
+        } catch (error) {
+          console.error("Error fetching measurands:", error);
+          setError(error.message || "Failed to fetch measurands");
+          setMeasurandOptions([]);
+        } finally {
+          setLoading((prev) => ({ ...prev, measurands: false }));
+        }
       }
+    } else if (field === "measurandIds") {
+      const selectedNames = value;
+      const selectedIds = measurandOptions
+        .filter((option) => selectedNames.includes(option.measurandName))
+        .map((option) => option.measurandId);
+      setNewTable((prev) => ({
+        ...prev,
+        measurandIds: selectedIds,
+        measurandNames: selectedNames,
+      }));
     }
   };
 
-  // ------------- Creates the new table and closes the dialog ------------------
   const handleCreate = () => {
     if (
-      !newTable.plantName ||
-      !newTable.terminalName ||
-      !newTable.measurandNames.length
+      !newTable.plantId ||
+      !newTable.terminalId ||
+      !newTable.measurandIds.length
     ) {
       onCreate({ error: "Please complete all table fields" });
       return;
     }
-    onCreate(newTable);
+    const tableToCreate = {
+      plantId: newTable.plantId,
+      terminalId: newTable.terminalId,
+      measurandIds: newTable.measurandIds,
+      plantName: newTable.plantName,
+      terminalName: newTable.terminalName,
+      measurandNames: newTable.measurandNames,
+    };
+    onCreate(tableToCreate);
     handleClose();
   };
 
-  // ------------- Resets the form and closes the dialog ------------------
   const handleClose = () => {
-    setNewTable({ plantName: "", terminalName: "", measurandNames: [] });
+    setNewTable({
+      plantId: "",
+      terminalId: "",
+      measurandIds: [],
+      plantName: "",
+      terminalName: "",
+      measurandNames: [],
+    });
     setTerminalOptions([]);
     setMeasurandOptions([]);
+    setError(null);
     onClose();
   };
 
-  // ------------- Main render of the create table dialog UI ------------------
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
       <DialogTitle>
@@ -154,16 +199,19 @@ const CreateTableDialog = ({ open, onClose, onCreate }) => {
               <InputLabel id="plant-label">Plant Name</InputLabel>
               <Select
                 labelId="plant-label"
-                value={newTable.plantName}
+                value={newTable.plantId}
                 label="Plant Name"
-                onChange={handleNewTableChange("plantName")}
+                onChange={handleNewTableChange("plantId")}
                 endAdornment={
                   loading.plants ? <CircularProgress size={20} /> : null
                 }
               >
+                <MenuItem value="">
+                  <em>Select Plant</em>
+                </MenuItem>
                 {plantOptions.map((option) => (
-                  <MenuItem key={option.PlantId} value={option.PlantName}>
-                    {option.PlantName}
+                  <MenuItem key={option.plantId} value={option.plantId}>
+                    {option.plantName}
                   </MenuItem>
                 ))}
               </Select>
@@ -173,21 +221,24 @@ const CreateTableDialog = ({ open, onClose, onCreate }) => {
           <Grid item xs={12}>
             <FormControl
               fullWidth
-              disabled={!newTable.plantName || loading.terminals}
+              disabled={!newTable.plantId || loading.terminals}
             >
               <InputLabel id="terminal-label">Terminal Name</InputLabel>
               <Select
                 labelId="terminal-label"
-                value={newTable.terminalName}
+                value={newTable.terminalId}
                 label="Terminal Name"
-                onChange={handleNewTableChange("terminalName")}
+                onChange={handleNewTableChange("terminalId")}
                 endAdornment={
                   loading.terminals ? <CircularProgress size={20} /> : null
                 }
               >
+                <MenuItem value="">
+                  <em>Select Terminal</em>
+                </MenuItem>
                 {terminalOptions.map((option) => (
-                  <MenuItem key={option.TerminalId} value={option.TerminalName}>
-                    {option.TerminalName}
+                  <MenuItem key={option.terminalId} value={option.terminalId}>
+                    {option.terminalName}
                   </MenuItem>
                 ))}
               </Select>
@@ -197,7 +248,7 @@ const CreateTableDialog = ({ open, onClose, onCreate }) => {
           <Grid item xs={12}>
             <FormControl
               fullWidth
-              disabled={!newTable.terminalName || loading.measurands}
+              disabled={!newTable.terminalId || loading.measurands}
             >
               <InputLabel id="measurand-label">Measurand Options</InputLabel>
               <Select
@@ -205,7 +256,7 @@ const CreateTableDialog = ({ open, onClose, onCreate }) => {
                 multiple
                 value={newTable.measurandNames}
                 label="Measurand Options"
-                onChange={handleNewTableChange("measurandNames")}
+                onChange={handleNewTableChange("measurandIds")}
                 renderValue={(selected) => (
                   <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
                     {selected.map((value) => (
@@ -219,15 +270,15 @@ const CreateTableDialog = ({ open, onClose, onCreate }) => {
               >
                 {measurandOptions.map((option) => (
                   <MenuItem
-                    key={option.MeasurandId}
-                    value={option.MeasurandName}
+                    key={option.measurandId}
+                    value={option.measurandName}
                   >
                     <Checkbox
                       checked={newTable.measurandNames.includes(
-                        option.MeasurandName
+                        option.measurandName
                       )}
                     />
-                    <ListItemText primary={option.MeasurandName} />
+                    <ListItemText primary={option.measurandName} />
                   </MenuItem>
                 ))}
               </Select>
@@ -244,9 +295,9 @@ const CreateTableDialog = ({ open, onClose, onCreate }) => {
           onClick={handleCreate}
           variant="contained"
           disabled={
-            !newTable.plantName ||
-            !newTable.terminalName ||
-            !newTable.measurandNames.length
+            !newTable.plantId ||
+            !newTable.terminalId ||
+            !newTable.measurandIds.length
           }
         >
           Create Table

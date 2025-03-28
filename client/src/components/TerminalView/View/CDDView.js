@@ -39,6 +39,7 @@ import CreateWidgetDialog from "../CreationForm/CreateWidgetDialog";
 import DeleteConfirmationDialog from "../../DeleteConfirmationDialog";
 import SaveIcon from "@mui/icons-material/Save";
 import UpdateIcon from "@mui/icons-material/Update";
+import { preserveWidgetTemplatesAndClear } from "../../localStorageUtils"; // Import utility
 
 const BASE_URL = `${process.env.REACT_APP_API_LOCAL_URL}api`;
 
@@ -124,10 +125,17 @@ const CDDView = () => {
 
   const fetchGraphHistory = useCallback(
     async (measurandName) => {
+      const terminalData = terminals.find((t) => t.TerminalName === terminal);
+      const measurandData = availableMeasurands.find(
+        (m) => m.MeasurandName === measurandName
+      );
+      if (!terminalData || !measurandData) return [];
+
       try {
         const response = await axios.get(
-          `${BASE_URL}/hdd/graph/${plant}/${terminal}/${measurandName}`
+          `${BASE_URL}/hdd/historical/${terminalData.TerminalID}/${measurandData.MeasurandId}`
         );
+        if (!response.data.success) throw new Error(response.data.message);
         return response.data.data.map((d) => ({
           value: d.MeasurandValue,
           timestamp: d.Timestamp,
@@ -137,7 +145,7 @@ const CDDView = () => {
         return [];
       }
     },
-    [plant, terminal]
+    [terminal, terminals, availableMeasurands]
   );
 
   const fetchMeasurandValue = useCallback(
@@ -159,9 +167,9 @@ const CDDView = () => {
         return { value: null, timestamp: null };
       }
     },
-    [plant, terminal] // Dependencies ensure stability
+    [plant, terminal]
   );
-  // Reset state and log mount/unmount
+
   useEffect(() => {
     console.log("CDDView mounted");
     return () => {
@@ -172,7 +180,6 @@ const CDDView = () => {
     };
   }, []);
 
-  // Graph Data Fetching
   useEffect(() => {
     if (!showWidgets || !plant || !terminal || !createdWidgets.length) {
       setGraphData({});
@@ -192,15 +199,11 @@ const CDDView = () => {
         await Promise.all(
           graphWidgets.map(async (widget) => {
             const data = await fetchGraphHistory(widget.measurandName);
-            if (isMounted) {
-              newGraphData[widget.measurandName] = data;
-            }
+            if (isMounted) newGraphData[widget.measurandName] = data;
           })
         );
 
-        if (isMounted) {
-          setGraphData(newGraphData);
-        }
+        if (isMounted) setGraphData(newGraphData);
       } catch (error) {
         console.error("Error fetching graph data:", error);
       }
@@ -217,7 +220,6 @@ const CDDView = () => {
     };
   }, [showWidgets, plant, terminal, createdWidgets, fetchGraphHistory]);
 
-  // Measurand Value Fetching
   useEffect(() => {
     if (
       !showWidgets ||
@@ -253,7 +255,6 @@ const CDDView = () => {
 
         if (isMounted) {
           setCreatedWidgets((prev) => {
-            // Only update if values have changed to prevent re-renders
             const currentNumberWidgets = prev.filter(
               (w) => w.widgetType === "number"
             );
@@ -264,7 +265,7 @@ const CDDView = () => {
                 updated.timestamp !== current.timestamp
               );
             });
-            if (!hasChanges) return prev; // Avoid re-render if no changes
+            if (!hasChanges) return prev;
             return [
               ...prev.filter((w) => w.widgetType !== "number"),
               ...updatedWidgets,
@@ -295,7 +296,7 @@ const CDDView = () => {
     createdWidgets,
     fetchMeasurandValue,
   ]);
-  // Memoize NumberWidget props at the top level
+
   const numberWidgetPropsMap = useMemo(() => {
     return layout.reduce((acc, item) => {
       if (!item.i.includes("-graph")) {
@@ -305,7 +306,7 @@ const CDDView = () => {
           title,
           widgetId: item.i,
           terminalInfo: `${plant} - ${terminal}`,
-          fetchValue: () => fetchMeasurandValue(title), // Stable reference due to useCallback
+          fetchValue: () => fetchMeasurandValue(title),
           value: widget?.value,
           timestamp: widget?.timestamp,
           onDelete: (id) => {
@@ -439,16 +440,13 @@ const CDDView = () => {
   };
 
   const validateViewName = (name) => {
-    if (!name.trim()) {
-      return "View name cannot be empty";
-    }
+    if (!name.trim()) return "View name cannot be empty";
     if (
       savedViews.some(
         (view) => view.name.toLowerCase() === name.trim().toLowerCase()
       )
-    ) {
+    )
       return "A view with this name already exists";
-    }
     return "";
   };
 
@@ -490,7 +488,7 @@ const CDDView = () => {
 
       const response = await axios.post(`${BASE_URL}/saved-views`, viewData);
       setSavedViews((prev) => [...prev, response.data]);
-
+      preserveWidgetTemplatesAndClear(); // Clear except widget templates
       setSaveDialogOpen(false);
       setViewName("");
       setViewDescription("");
@@ -498,8 +496,10 @@ const CDDView = () => {
       showSnackbar("View saved successfully", "success");
     } catch (error) {
       console.error("Error saving view:", error.response?.data || error);
-      const errorMessage = error.response?.data?.message || "Error saving view";
-      showSnackbar(errorMessage, "error");
+      showSnackbar(
+        error.response?.data?.message || "Error saving view",
+        "error"
+      );
     }
   };
 
@@ -533,12 +533,14 @@ const CDDView = () => {
       setSavedViews((prev) =>
         prev.map((v) => (v._id === selectedView ? response.data : v))
       );
+      preserveWidgetTemplatesAndClear(); // Clear except widget templates
       showSnackbar("View updated successfully", "success");
     } catch (error) {
       console.error("Error updating view:", error.response?.data || error);
-      const errorMessage =
-        error.response?.data?.message || "Error updating view";
-      showSnackbar(errorMessage, "error");
+      showSnackbar(
+        error.response?.data?.message || "Error updating view",
+        "error"
+      );
     }
   };
 
@@ -608,6 +610,7 @@ const CDDView = () => {
       setShowWidgets(false);
       setCreatedWidgets([]);
       setSelectionInfo(null);
+      preserveWidgetTemplatesAndClear(); // Clear except widget templates
       showSnackbar("View deleted successfully", "error");
     } catch (error) {
       console.error("Error deleting view:", error);
@@ -707,10 +710,7 @@ const CDDView = () => {
           }))
         : prev.map((w) =>
             w.i === selectedWidgetId
-              ? {
-                  ...w,
-                  properties: { ...w.properties, ...settings },
-                }
+              ? { ...w, properties: { ...w.properties, ...settings } }
               : w
           );
 
@@ -736,9 +736,7 @@ const CDDView = () => {
     setSelectedWidgetId(null);
   };
 
-  const TransitionSlide = (props) => {
-    return <Slide {...props} direction="left" />;
-  };
+  const TransitionSlide = (props) => <Slide {...props} direction="left" />;
 
   return (
     <Box sx={{ width: "100%" }}>
@@ -823,7 +821,6 @@ const CDDView = () => {
           >
             Go
           </Button>
-
           <Button
             variant="contained"
             onClick={handleAddWidget}
@@ -831,7 +828,6 @@ const CDDView = () => {
           >
             Add Widget
           </Button>
-
           <FormControl size="small" sx={{ minWidth: 200 }}>
             <InputLabel>Saved Views</InputLabel>
             <Select
@@ -849,7 +845,6 @@ const CDDView = () => {
               ))}
             </Select>
           </FormControl>
-
           {showWidgets && (
             <Tooltip title="Save View">
               <IconButton
@@ -861,7 +856,6 @@ const CDDView = () => {
               </IconButton>
             </Tooltip>
           )}
-
           {showWidgets && selectedView && (
             <Tooltip title="Update View">
               <IconButton
@@ -873,7 +867,6 @@ const CDDView = () => {
               </IconButton>
             </Tooltip>
           )}
-
           {selectedView && (
             <Tooltip title="Delete Selected View">
               <IconButton color="error" onClick={handleDeleteClick}>
@@ -959,7 +952,6 @@ const CDDView = () => {
             {layout.map((item) => {
               const isGraph = item.i.includes("-graph");
               const title = item.i.split("-")[0];
-
               return (
                 <div key={item.i}>
                   {isGraph ? (
@@ -967,7 +959,7 @@ const CDDView = () => {
                       title={title}
                       widgetId={item.i}
                       terminalInfo={`${plant} - ${terminal}`}
-                      fetchValue={(measurand) => fetchGraphHistory(measurand)}
+                      fetchValue={fetchGraphHistory}
                       onDelete={(id) => {
                         setLayout((prev) => prev.filter((l) => l.i !== id));
                         setCreatedWidgets((prev) =>
@@ -977,7 +969,10 @@ const CDDView = () => {
                           prev.filter((m) => m !== title)
                         );
                       }}
-                      availableMeasurands={availableMeasurands}
+                      availableMeasurands={availableMeasurands.map((m) => ({
+                        MeasurandName: m.MeasurandName,
+                        MeasurandId: m.MeasurandId,
+                      }))}
                       onOpenProperties={() => handleOpenProperties(item.i)}
                     />
                   ) : (

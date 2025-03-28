@@ -8,8 +8,28 @@ import SaveDashboardDialog from "../components/Dashboard/SaveDashboardDialog";
 import DeleteConfirmationDialog from "../components/DeleteConfirmationDialog";
 import SnackbarComponent from "../components/Dashboard/SnackbarComponent";
 import PropertiesDialog from "../components/Dashboard/PropertiesDialog";
+import { preserveWidgetTemplatesAndClear } from "../components/localStorageUtils";
 
 const API_BASE_URL = `${process.env.REACT_APP_API_LOCAL_URL}api`;
+
+const customDefaultWidgetSettings = {
+  backgroundColor: "#000000",
+  borderColor: "#ffffff",
+  borderRadius: "3px",
+  borderWidth: "1px",
+  titleColor: "#ffffff",
+  titleFontFamily: "Arial",
+  titleFontSize: "24px",
+  titleFontStyle: "normal",
+  titleFontWeight: "normal",
+  titleTextDecoration: "none",
+  valueColor: "#f8e71c",
+  valueFontFamily: "Arial",
+  valueFontSize: "24px",
+  valueFontStyle: "normal",
+  valueFontWeight: "bold",
+  valueTextDecoration: "none",
+};
 
 const Dashboard = ({
   onDashboardUpdate,
@@ -39,6 +59,7 @@ const Dashboard = ({
   const [originalWidgets, setOriginalWidgets] = useState([]);
   const [openPropertiesDialog, setOpenPropertiesDialog] = useState(false);
   const [selectedWidgetId, setSelectedWidgetId] = useState(null);
+  const [selectedWidgetData, setSelectedWidgetData] = useState(null); // Added to store full widget data
   const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
@@ -152,13 +173,18 @@ const Dashboard = ({
   };
 
   const handleSettingsClick = (widgetId) => {
+    const widget = widgets.find((w) => w.id === widgetId); // Find the full widget data
     setSelectedWidgetId(widgetId);
+    setSelectedWidgetData(widget); // Store the full widget object
     setOpenPropertiesDialog(true);
   };
 
-  const handleApplySettings = async (settings) => {
+  const handleApplySettings = async (settings, applyToAll) => {
+    // Updated to handle applyToAll option
     const updatedWidgets = widgets.map((widget) =>
-      widget.id === selectedWidgetId ? { ...widget, settings } : widget
+      applyToAll || widget.id === selectedWidgetId
+        ? { ...widget, settings }
+        : widget
     );
     setWidgets(updatedWidgets);
     localStorage.setItem("dashboardWidgets", JSON.stringify(updatedWidgets));
@@ -175,6 +201,7 @@ const Dashboard = ({
     }
     setOpenPropertiesDialog(false);
     setSelectedWidgetId(null);
+    setSelectedWidgetData(null); // Clear after applying
   };
 
   const triggerSnackbar = (message, severity = "success") => {
@@ -207,10 +234,11 @@ const Dashboard = ({
 
   const handleSaveWidget = async () => {
     const newWidget = {
-      id: Date.now(),
+      id: Date.now().toString(), // Ensure string ID for GridLayout compatibility
       type: widgetType,
       ...formData,
       measurands,
+      settings: { ...customDefaultWidgetSettings }, // Apply default settings
       layout: {
         i: Date.now().toString(),
         x: 0,
@@ -250,6 +278,7 @@ const Dashboard = ({
         }
         setDeleteDialogOpen(false);
         setWidgetToDelete(null);
+        preserveWidgetTemplatesAndClear();
         triggerSnackbar("Widget deleted successfully");
       } catch (error) {
         console.error("Error deleting widget:", error);
@@ -279,7 +308,7 @@ const Dashboard = ({
       setIsPublished(response.data.isPublished);
       setOriginalWidgets(response.data.widgets);
       setActiveDashboard(response.data.name);
-      localStorage.removeItem("dashboardWidgets");
+      preserveWidgetTemplatesAndClear();
       if (onDashboardUpdate) onDashboardUpdate();
       triggerSnackbar(`Dashboard "${dashboardName}" saved successfully`);
     } catch (error) {
@@ -298,7 +327,7 @@ const Dashboard = ({
       );
       setOriginalWidgets(response.data.widgets);
       setHasChanges(false);
-      localStorage.removeItem("dashboardWidgets");
+      preserveWidgetTemplatesAndClear();
       if (onDashboardUpdate) onDashboardUpdate();
       triggerSnackbar(`Dashboard "${dashboardName}" updated successfully`);
     } catch (error) {
@@ -318,7 +347,7 @@ const Dashboard = ({
       );
       setIsPublished(true);
       setOriginalWidgets(response.data.widgets);
-      localStorage.removeItem("dashboardWidgets");
+      preserveWidgetTemplatesAndClear();
       if (onDashboardUpdate) onDashboardUpdate();
       triggerSnackbar(`Dashboard "${dashboardName}" published successfully`);
     } catch (error) {
@@ -453,9 +482,15 @@ const Dashboard = ({
           />
           <PropertiesDialog
             open={openPropertiesDialog}
-            onClose={() => setOpenPropertiesDialog(false)}
+            onClose={() => {
+              setOpenPropertiesDialog(false);
+              setSelectedWidgetId(null);
+              setSelectedWidgetData(null);
+            }}
             selectedWidgetId={selectedWidgetId}
+            widgetData={selectedWidgetData} // Pass full widget data
             handleApplySettings={handleApplySettings}
+            viewId={dashboardName} // Pass dashboardName as viewId
           />
         </>
       )}
