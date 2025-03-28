@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-const MeasurandDetailsSchema = new mongoose.Schema(
+const MeasurandDataSchema = new mongoose.Schema(
   {
     MeasurandId: {
       type: Number,
@@ -18,31 +18,13 @@ const MeasurandDetailsSchema = new mongoose.Schema(
   { _id: false }
 );
 
-const ESPlantTerminalSchema = new mongoose.Schema(
+const ESPlantTerminalHD900Schema = new mongoose.Schema(
   {
-    MeasurandDetails: {
-      type: MeasurandDetailsSchema,
+    MeasurandData: {
+      type: [MeasurandDataSchema],
       required: true,
     },
-    TimeStamp: {
-      type: Date,
-      required: true,
-    },
-    TimeStampId: {
-      type: Number,
-      required: true,
-    },
-    PlantId: {
-      type: Number,
-      required: true,
-      index: true,
-    },
-    PlantName: {
-      type: String,
-      required: true,
-      index: true,
-    },
-    TerminalID: {
+    TerminalId: {
       type: Number,
       required: true,
       index: true,
@@ -52,14 +34,27 @@ const ESPlantTerminalSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    TimeStamp: {
+      type: Date,
+      required: true,
+      index: true,
+    },
+    TimeStampId: {
+      type: Number,
+      required: true,
+    },
+    DebugLogTime: {
+      type: String,
+      required: false,
+    },
   },
   {
     timestamps: false,
     autoIndex: true,
-    collection: "ESPlantTerminal",
+    collection: "ESPlantTerminalHD900",
   }
 );
 
 module.exports =
-  mongoose.models.ESPlantTerminal ||
-  mongoose.model("ESPlantTerminal", ESPlantTerminalSchema);
+  mongoose.models.ESPlantTerminalHD900 ||
+  mongoose.model("ESPlantTerminalHD900", ESPlantTerminalHD900Schema);

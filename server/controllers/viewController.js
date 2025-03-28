@@ -1,5 +1,6 @@
 const SaveView = require("../models/SaveView");
 
+// --------------------1. Save a new view--------------------
 exports.saveView = async (req, res) => {
   try {
     const { name, description, widgets, plant, terminal } = req.body;
@@ -8,7 +9,7 @@ exports.saveView = async (req, res) => {
       return res.status(400).json({ message: "Missing required fields" });
     }
 
-    // Validate widget positions
+    // ----------------- Validate widget positions -----------------
     const invalidWidgets = widgets.filter(
       (widget) =>
         !widget.position ||
@@ -57,6 +58,7 @@ exports.saveView = async (req, res) => {
   }
 };
 
+// --------------------2. Update an existing view--------------------
 exports.updateSavedView = async (req, res) => {
   try {
     const { id } = req.params;
@@ -66,7 +68,6 @@ exports.updateSavedView = async (req, res) => {
       return res.status(400).json({ message: "Missing required fields" });
     }
 
-    // Validate widget positions
     const invalidWidgets = widgets.filter(
       (widget) =>
         !widget.position ||
@@ -128,7 +129,7 @@ exports.updateSavedView = async (req, res) => {
   }
 };
 
-// Keep other existing methods (getSavedViews, getSavedViewById, deleteSavedView, updateWidgetProperties) unchanged
+// --------------------3. Get all saved views--------------------
 exports.getSavedViews = async (req, res) => {
   try {
     const views = await SaveView.find().lean();
@@ -140,6 +141,7 @@ exports.getSavedViews = async (req, res) => {
   }
 };
 
+// --------------------4. Get a specific saved view by ID--------------------
 exports.getSavedViewById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -155,6 +157,7 @@ exports.getSavedViewById = async (req, res) => {
   }
 };
 
+// --------------------5. Delete a saved view by ID--------------------
 exports.deleteSavedView = async (req, res) => {
   try {
     const { id } = req.params;
@@ -170,6 +173,7 @@ exports.deleteSavedView = async (req, res) => {
   }
 };
 
+// --------------------6. Update widget properties --------------------
 exports.updateWidgetProperties = async (req, res) => {
   try {
     const { viewId, widgetId } = req.params;

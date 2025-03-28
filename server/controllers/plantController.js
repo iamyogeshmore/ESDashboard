@@ -30,7 +30,7 @@ exports.getTerminalInfo = async (req, res) => {
       {
         $group: {
           _id: "$TerminalName",
-          TerminalId: { $first: "$TerminalId" },
+          TerminalId: { $first: "$TerminalID" },
         },
       },
       {

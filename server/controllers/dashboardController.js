@@ -11,9 +11,9 @@ exports.createDashboard = async (req, res) => {
       isPublished: false,
     });
     await dashboard.save();
-    res.status(201).json(dashboard);
+    return { status: 201, data: dashboard };
   } catch (error) {
-    res.status(500).json({ message: "Server error", error: error.message });
+    return { status: 500, error: "Server error", message: error.message };
   }
 };
 
@@ -21,9 +21,9 @@ exports.createDashboard = async (req, res) => {
 exports.getDashboards = async (req, res) => {
   try {
     const dashboards = await Dashboard.find();
-    res.json(dashboards);
+    return { status: 200, data: dashboards };
   } catch (error) {
-    res.status(500).json({ message: "Server error", error: error.message });
+    return { status: 500, error: "Server error", message: error.message };
   }
 };
 
@@ -32,11 +32,12 @@ exports.getDashboard = async (req, res) => {
   try {
     const { name } = req.params;
     const dashboard = await Dashboard.findOne({ name });
-    if (!dashboard)
-      return res.status(404).json({ message: "Dashboard not found" });
-    res.json(dashboard);
+    if (!dashboard) {
+      return { status: 404, error: "Dashboard not found" };
+    }
+    return { status: 200, data: dashboard };
   } catch (error) {
-    res.status(500).json({ message: "Server error", error: error.message });
+    return { status: 500, error: "Server error", message: error.message };
   }
 };
 
@@ -46,11 +47,12 @@ exports.getActiveDashboard = async (req, res) => {
     const dashboard = await Dashboard.findOne({ isPublished: true }).sort({
       updatedAt: -1,
     });
-    if (!dashboard)
-      return res.status(404).json({ message: "No active dashboard found" });
-    res.json(dashboard);
+    if (!dashboard) {
+      return { status: 404, error: "No active dashboard found" };
+    }
+    return { status: 200, data: dashboard };
   } catch (error) {
-    res.status(500).json({ message: "Server error", error: error.message });
+    return { status: 500, error: "Server error", message: error.message };
   }
 };
 
@@ -62,15 +64,15 @@ exports.updateWidgetSelections = async (req, res) => {
 
     const dashboard = await Dashboard.findOne({ name });
     if (!dashboard) {
-      return res.status(404).json({ message: "Dashboard not found" });
+      return { status: 404, error: "Dashboard not found" };
     }
 
     const widget = dashboard.widgets.find((w) => w.id === Number(widgetId));
     if (!widget) {
-      return res.status(404).json({ message: "Widget not found" });
+      return { status: 404, error: "Widget not found" };
     }
 
-    // Update widget selections
+    // ---------------- Update widget selections -----------------
     widget.selectedPlant = selectedPlant || widget.selectedPlant;
     widget.selectedTerminals =
       selectedTerminals || widget.selectedTerminals || [];
@@ -79,9 +81,9 @@ exports.updateWidgetSelections = async (req, res) => {
     dashboard.updatedAt = Date.now();
 
     await dashboard.save();
-    res.json(widget);
+    return { status: 200, data: widget };
   } catch (error) {
-    res.status(500).json({ message: "Server error", error: error.message });
+    return { status: 500, error: "Server error", message: error.message };
   }
 };
 
@@ -92,7 +94,7 @@ exports.createWidget = async (req, res) => {
     const widgetData = req.body;
     const dashboard = await Dashboard.findOne({ name });
     if (!dashboard) {
-      return res.status(404).json({ message: "Dashboard not found" });
+      return { status: 404, error: "Dashboard not found" };
     }
 
     const newWidget = {
@@ -111,9 +113,9 @@ exports.createWidget = async (req, res) => {
     dashboard.widgets.push(newWidget);
     dashboard.updatedAt = Date.now();
     await dashboard.save();
-    res.status(201).json(newWidget);
+    return { status: 201, data: newWidget };
   } catch (error) {
-    res.status(500).json({ message: "Server error", error: error.message });
+    return { status: 500, error: "Server error", message: error.message };
   }
 };
 
@@ -122,61 +124,63 @@ exports.deleteWidget = async (req, res) => {
   try {
     const { name, widgetId } = req.params;
     const dashboard = await Dashboard.findOne({ name });
-    if (!dashboard)
-      return res.status(404).json({ message: "Dashboard not found" });
+    if (!dashboard) {
+      return { status: 404, error: "Dashboard not found" };
+    }
 
     dashboard.widgets = dashboard.widgets.filter(
       (w) => w.id !== Number(widgetId)
     );
     dashboard.updatedAt = Date.now();
     await dashboard.save();
-    res.json({ message: "Widget deleted" });
+    return { status: 200, data: { message: "Widget deleted" } };
   } catch (error) {
-    res.status(500).json({ message: "Server error", error: error.message });
+    return { status: 500, error: "Server error", message: error.message };
   }
 };
 
-// -------------------- 8. Updates a specific dashboard with provided data --------------------
-exports.updateDashboard = async (req, res) => {
-  try {
-    const { name } = req.params;
-    const updatedData = req.body;
-    const dashboard = await Dashboard.findOneAndUpdate(
-      { name },
-      { ...updatedData, updatedAt: Date.now() },
-      { new: true }
-    );
-    if (!dashboard)
-      return res.status(404).json({ message: "Dashboard not found" });
-    res.json(dashboard);
-  } catch (error) {
-    res.status(500).json({ message: "Server error", error: error.message });
-  }
-};
-
-// -------------------- 9. Publishes a specific dashboard and unpublishes all others --------------------
+// -------------------- 8. Publishes a specific dashboard --------------------
 exports.publishDashboard = async (req, res) => {
   try {
     const { name } = req.params;
 
-    // Unpublish all other dashboards
-    await Dashboard.updateMany(
-      { name: { $ne: name } }, // $ne means "not equal"
-      { isPublished: false }
-    );
+    // -------------------- Unpublish all other dashboards --------------------
+    await Dashboard.updateMany({ name: { $ne: name } }, { isPublished: false });
 
-    // Publish the selected dashboard
+    // -------------------- Publish the selected dashboard --------------------
     const dashboard = await Dashboard.findOneAndUpdate(
       { name },
       { isPublished: true, updatedAt: Date.now() },
       { new: true }
     );
 
-    if (!dashboard)
-      return res.status(404).json({ message: "Dashboard not found" });
-    res.json(dashboard);
+    if (!dashboard) {
+      return { status: 404, error: "Dashboard not found" };
+    }
+    return { status: 200, data: dashboard };
   } catch (error) {
-    res.status(500).json({ message: "Server error", error: error.message });
+    return { status: 500, error: "Server error", message: error.message };
+  }
+};
+
+// -------------------- 9. Updates a specific dashboard --------------------
+exports.updateDashboard = async (req, res) => {
+  try {
+    const { name } = req.params;
+    const updateData = req.body;
+
+    const dashboard = await Dashboard.findOneAndUpdate(
+      { name },
+      { ...updateData, updatedAt: Date.now() },
+      { new: true }
+    );
+
+    if (!dashboard) {
+      return { status: 404, error: "Dashboard not found" };
+    }
+    return { status: 200, data: dashboard };
+  } catch (error) {
+    return { status: 500, error: "Server error", message: error.message };
   }
 };
 
@@ -187,7 +191,7 @@ exports.deleteDashboard = async (req, res) => {
 
     const dashboard = await Dashboard.findOneAndDelete({ name });
     if (!dashboard) {
-      return res.status(404).json({ message: "Dashboard not found" });
+      return { status: 404, error: "Dashboard not found" };
     }
 
     // If the deleted dashboard was published, publish the most recently updated remaining dashboard
@@ -201,8 +205,11 @@ exports.deleteDashboard = async (req, res) => {
       }
     }
 
-    res.json({ message: `Dashboard "${name}" deleted successfully` });
+    return {
+      status: 200,
+      data: { message: `Dashboard "${name}" deleted successfully` },
+    };
   } catch (error) {
-    res.status(500).json({ message: "Server error", error: error.message });
+    return { status: 500, error: "Server error", message: error.message };
   }
 };

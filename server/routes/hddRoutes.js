@@ -2,36 +2,36 @@ const express = require("express");
 const router = express.Router();
 const hddController = require("../controllers/hddController");
 
-// -------------------- 1. Get all HDD views --------------------
+// -------------------- 1. Get HDD Views --------------------
 router.get("/", hddController.getHDDViews);
 
-// -------------------- 2. Create a new HDD view --------------------
+// -------------------- 2. Create HDD Views --------------------
 router.post("/create", hddController.createHDDView);
 
-// -------------------- 3. Update an HDD view --------------------
+// -------------------- 3.Update HDD Views --------------------
 router.put("/:id", hddController.updateHDDView);
 
-// -------------------- 4. Delete an HDD view --------------------
+// -------------------- 4.Delete HDD Views --------------------
 router.delete("/:id", hddController.deleteHDDView);
 
-// -------------------- 5. Get unique plant names --------------------
+// -------------------- 5. Get Plant Information --------------------
 router.get("/plants", hddController.getPlants);
 
-// -------------------- 6. Get unique terminal names for a plant --------------------
-router.get("/terminals/:plantName", hddController.getTerminals);
+// -------------------- 6. Get Terminal Information --------------------
+router.get("/terminals/:plantId", hddController.getTerminals);
 
-// -------------------- 7. Get unique measurand names for a plant and terminal --------------------
-router.get("/measurands/:plantName/:terminalName", hddController.getMeasurands);
+// -------------------- 7. Get Measurand Information --------------------
+router.get("/measurands/:plantId/:terminalId", hddController.getMeasurands);
 
-// -------------------- 8. Get measurand values with date filter --------------------
+// -------------------- 8. Get Measurement Data --------------------
 router.get(
-  "/historical/:plantName/:terminalName/:measurandName",
+  "/historical/:terminalId/:measurandId",
   hddController.getHistoricalMeasurandValues
 );
 
-// --------------------9. Get Get measurand values for graph --------------------
+// -------------------- 9. Get Measurement Data for Graph --------------------
 router.get(
-  "/graph/:plantName/:terminalName/:measurandName",
+  "/graph/:terminalName/:measurandName",
   hddController.getHistoricalMeasurandValuesForGraph
 );
 
