@@ -172,16 +172,17 @@ const ApplyButton = styled(Button)(({ theme, isDarkMode }) => ({
 }));
 
 const formatTimestamp = (timestamp) => {
-  if (!timestamp) return "";
+  if (!timestamp) return "No timestamp available";
   const date = new Date(timestamp);
-  return date.toLocaleString("en-US", {
-    year: "numeric",
-    month: "2-digit",
+  return date.toLocaleString("en-GB", {
     day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
     hour12: false,
+    timeZone: "UTC",
   });
 };
 
@@ -232,7 +233,7 @@ const DashboardGraphWidget = ({
   const [isHovered, setIsHovered] = useState(false);
   const [graphData, setGraphData] = useState({});
   const [selectedMeasurands, setSelectedMeasurands] = useState(
-    data.measurement ? [{ name: data.measurement, color: colorOptions[0] }] : []
+    data.measurandId ? [{ id: data.measurandId, color: colorOptions[0] }] : []
   );
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -332,13 +333,14 @@ const DashboardGraphWidget = ({
     resolveTerminalDetails();
   }, [data.terminal, data.plantId, data.terminalId]);
 
-  const fetchGraphData = async (measurandName) => {
+  const fetchGraphData = async (measurandId) => {
     try {
-      const { terminal } = data;
-      if (!terminal || !measurandName)
-        throw new Error("Missing terminal or measurand");
+      const { terminalId } = terminalDetails;
+      if (!terminalId || !measurandId) {
+        return [];
+      }
       const response = await axios.get(
-        `${API_BASE_URL}/hdd/graph/${terminal}/${measurandName}`
+        `${API_BASE_URL}/hdd/graph/${terminalId}/${measurandId}`
       );
       const fetchedData = response.data.data
         .map((item) => ({
@@ -348,10 +350,7 @@ const DashboardGraphWidget = ({
         .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
       return fetchedData;
     } catch (error) {
-      console.error(`Error fetching graph data for ${measurandName}:`, error);
-      setSnackbarMessage(`Failed to fetch data for ${measurandName}`);
-      setSnackbarSeverity("error");
-      setSnackbarOpen(true);
+      console.error(`Error fetching graph data for ${measurandId}:`, error);
       return [];
     }
   };
@@ -362,8 +361,8 @@ const DashboardGraphWidget = ({
       const newData = {};
       await Promise.all(
         selectedMeasurands.map(async (measurand) => {
-          const fetchedData = await fetchGraphData(measurand.name);
-          newData[measurand.name] = fetchedData;
+          const fetchedData = await fetchGraphData(measurand.id);
+          newData[measurand.id] = fetchedData;
         })
       );
       if (isMounted) setGraphData((prev) => ({ ...prev, ...newData }));
@@ -376,7 +375,7 @@ const DashboardGraphWidget = ({
         clearInterval(interval);
       };
     }
-  }, [selectedMeasurands, data.terminal]);
+  }, [selectedMeasurands, terminalDetails.terminalId]);
 
   useEffect(() => {
     return () => {
@@ -398,13 +397,17 @@ const DashboardGraphWidget = ({
 
   const chartData = {
     labels:
-      selectedMeasurands.length > 0 && graphData[selectedMeasurands[0].name]
-        ? graphData[selectedMeasurands[0].name].map((d) =>
+      selectedMeasurands.length > 0 && graphData[selectedMeasurands[0].id]
+        ? graphData[selectedMeasurands[0].id].map((d) =>
             formatTimestamp(d.timestamp)
           )
         : [],
     datasets: selectedMeasurands.map((measurand) => {
-      const dataPoints = (graphData[measurand.name] || []).map((d) => d.value);
+      const measurandInfo = availableMeasurands.find(
+        (m) => m.MeasurandId === measurand.id
+      );
+      const label = measurandInfo ? measurandInfo.MeasurandName : measurand.id;
+      const dataPoints = (graphData[measurand.id] || []).map((d) => d.value);
       const pointRadius = dataPoints.map((_, index) =>
         index === dataPoints.length - 1 ? 5 : 0
       );
@@ -412,7 +415,7 @@ const DashboardGraphWidget = ({
         index === dataPoints.length - 1 ? "red" : measurand.color.value
       );
       return {
-        label: measurand.name,
+        label,
         data: dataPoints,
         backgroundColor: measurand.color.bg,
         borderColor: measurand.color.value,
@@ -542,12 +545,15 @@ const DashboardGraphWidget = ({
         ? { name: "Custom", value: `${customColor}`, bg: `${customColor}33` }
         : colorOptions.find((c) => c.name === color);
     const newMeasurands = [...selectedMeasurands];
-    const existingIndex = newMeasurands.findIndex((m) => m.name === measurand);
+    const measurandId = availableMeasurands.find(
+      (m) => m.MeasurandName === measurand
+    )?.MeasurandId;
+    const existingIndex = newMeasurands.findIndex((m) => m.id === measurandId);
     if (existingIndex >= 0) {
-      newMeasurands[existingIndex] = { name: measurand, color: selectedColor };
+      newMeasurands[existingIndex] = { id: measurandId, color: selectedColor };
       setSnackbarMessage("Measurand updated successfully");
     } else if (newMeasurands.length < 3) {
-      newMeasurands.push({ name: measurand, color: selectedColor });
+      newMeasurands.push({ id: measurandId, color: selectedColor });
       setSnackbarMessage("Measurand added successfully");
     } else {
       setSnackbarMessage("Maximum 3 measurands allowed for comparison");
@@ -680,7 +686,7 @@ const DashboardGraphWidget = ({
                   mr: 1,
                   color: isDarkMode ? "#fecaca" : "#b91c1c",
                 }}
-              />{" "}
+              />
               Delete
             </MenuItem>
             <MenuItem

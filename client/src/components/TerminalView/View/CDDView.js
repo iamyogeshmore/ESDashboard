@@ -148,11 +148,18 @@ const CDDView = () => {
     [terminal, terminals, availableMeasurands]
   );
 
+  // CDDView.jsx
   const fetchMeasurandValue = useCallback(
     async (measurandName, signal) => {
       try {
+        const terminalData = terminals.find((t) => t.TerminalName === terminal);
+        const measurandData = availableMeasurands.find(
+          (m) => m.MeasurandName === measurandName
+        );
+        const plantData = plants.find((p) => p.PlantName === plant);
+
         const response = await axios.get(
-          `${BASE_URL}/measurements/${plant}/${terminal}/${measurandName}`,
+          `${BASE_URL}/measurements/${plantData.PlantId}/${terminalData.TerminalID}/${measurandData.MeasurandId}`,
           { signal }
         );
         const data = response.data[0];
@@ -167,7 +174,7 @@ const CDDView = () => {
         return { value: null, timestamp: null };
       }
     },
-    [plant, terminal]
+    [plant, terminal, plants, terminals, availableMeasurands]
   );
 
   useEffect(() => {

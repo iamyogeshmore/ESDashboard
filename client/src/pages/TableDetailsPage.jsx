@@ -37,20 +37,19 @@ import "../styles/TableDetailsPage.css";
 import { ThemeContext } from "../contexts/ThemeContext";
 import GraphComponent from "../components/Widgets/HDDGraph";
 
-// Base API endpoint from environment variables
 const BASE_URL = `${process.env.REACT_APP_API_LOCAL_URL}api/hdd`;
 
 const formatTimestamp = (timestamp) => {
   if (!timestamp) return "No timestamp available";
   const date = new Date(timestamp);
-  return date.toLocaleString("en-US", {
-    year: "numeric",
-    month: "2-digit",
+  return date.toLocaleString("en-GB", {
     day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
-    hour12: false, 
+    hour12: false,
     timeZone: "UTC",
   });
 };
@@ -58,7 +57,7 @@ const formatTimestamp = (timestamp) => {
 // In-memory cache
 const historicalCache = {};
 
-// Styled components
+// Styled components (unchanged)
 const DifferenceBox = styled(Box)(({ theme, isNegative, isZero }) => ({
   display: "flex",
   alignItems: "center",
@@ -223,12 +222,20 @@ const TableDetailsPage = () => {
     measurand: null,
   });
 
-  // Default to last 1 hour
   const now = new Date();
-  const defaultStart = new Date(now.getTime() - 60 * 60 * 1000)
-    .toISOString()
-    .slice(0, 16);
-  const defaultEnd = now.toISOString().slice(0, 16);
+  const startOfDay = new Date(
+    Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate(),
+      0,
+      0,
+      0,
+      0
+    )
+  );
+  const defaultStart = startOfDay.toISOString().slice(0, 16);
+  const defaultEnd = new Date(now.getTime()).toISOString().slice(0, 16);
   const [dateFilter, setDateFilter] = useState({
     start: defaultStart,
     end: defaultEnd,
@@ -249,6 +256,16 @@ const TableDetailsPage = () => {
   const handleSnackbarClose = (event, reason) => {
     if (reason === "clickaway") return;
     hideSnackbar();
+  };
+
+  const handleTimeRangeClick = (hours) => {
+    const startDate = new Date(dateFilter.start + "Z"); // Ensure UTC by appending "Z"
+    const endDate = new Date(startDate.getTime()); // Clone startDate
+    endDate.setUTCHours(endDate.getUTCHours() + hours); // Add hours in UTC
+    setDateFilter({
+      start: startDate.toISOString().slice(0, 16),
+      end: endDate.toISOString().slice(0, 16),
+    });
   };
 
   const fetchTableData = useCallback(async () => {
@@ -292,7 +309,7 @@ const TableDetailsPage = () => {
         `${BASE_URL}/measurands/${table.plantId}/${table.terminalId}`
       );
       if (!response.data.success) throw new Error(response.data.message);
-      setAvailableMeasurands(response.data.data); // Now gets all measurands
+      setAvailableMeasurands(response.data.data || []);
       showSnackbar("Measurands loaded successfully", "success");
     } catch (error) {
       console.error("Error fetching available measurands:", error);
@@ -863,18 +880,21 @@ const TableDetailsPage = () => {
                   },
                 }}
               >
-                <StyledMenuItem value="">
+                <MenuItem value="">
                   <em>Select an option</em>
-                </StyledMenuItem>
-                {availableMeasurands.map((option) => (
-                  <StyledMenuItem
-                    key={option.measurandId}
-                    value={option.measurandName}
-                    isSelected={measurandOptions.includes(option.measurandName)}
-                  >
-                    {option.measurandName}
-                  </StyledMenuItem>
-                ))}
+                </MenuItem>
+                {availableMeasurands
+                  .filter(
+                    (option) => !measurandOptions.includes(option.measurandName)
+                  )
+                  .map((option) => (
+                    <StyledMenuItem
+                      key={option.measurandId}
+                      value={option.measurandName}
+                    >
+                      {option.measurandName}{" "}
+                    </StyledMenuItem>
+                  ))}
               </Select>
             </FormControl>
             <StyledButton
@@ -897,26 +917,66 @@ const TableDetailsPage = () => {
             </Typography>
             <TextField
               type="datetime-local"
-              label="Start Date"
+              label="Start Date (UTC)"
               value={dateFilter.start}
               onChange={(e) =>
                 setDateFilter((prev) => ({ ...prev, start: e.target.value }))
               }
               InputLabelProps={{ shrink: true }}
+              inputProps={{ step: 60 }}
               fullWidth
               sx={{ mb: 2 }}
             />
             <TextField
               type="datetime-local"
-              label="End Date"
+              label="End Date (UTC)"
               value={dateFilter.end}
               onChange={(e) =>
                 setDateFilter((prev) => ({ ...prev, end: e.target.value }))
               }
               InputLabelProps={{ shrink: true }}
+              inputProps={{ step: 60 }}
               fullWidth
               sx={{ mb: 2 }}
             />
+            <Box sx={{ mb: 2 }}>
+              <Chip
+                label="1 Hour"
+                onClick={() => handleTimeRangeClick(1)}
+                sx={{
+                  mr: 1,
+                  bgcolor: isDarkMode ? "#0288d1" : "#e1f5fe",
+                  color: isDarkMode ? "white" : "#0288d1",
+                  "&:hover": {
+                    bgcolor: isDarkMode ? "#4fc3f7" : "#b3e5fc",
+                  },
+                }}
+              />
+              <Chip
+                label="8 Hours"
+                onClick={() => handleTimeRangeClick(8)}
+                sx={{
+                  mr: 1,
+                  bgcolor: isDarkMode ? "#0288d1" : "#e1f5fe",
+                  color: isDarkMode ? "white" : "#0288d1",
+                  "&:hover": {
+                    bgcolor: isDarkMode ? "#4fc3f7" : "#b3e5fc",
+                  },
+                }}
+              />
+              <Chip
+                label="24 Hours"
+                onClick={() => handleTimeRangeClick(24)}
+                sx={{
+                  mr: 1,
+                  bgcolor: isDarkMode ? "#0288d1" : "#e1f5fe",
+                  color: isDarkMode ? "white" : "#0288d1",
+                  "&:hover": {
+                    bgcolor: isDarkMode ? "#4fc3f7" : "#b3e5fc",
+                  },
+                }}
+              />
+            </Box>
             <Box
               sx={{ mt: 2, display: "flex", justifyContent: "center", gap: 2 }}
             >
@@ -946,12 +1006,18 @@ const TableDetailsPage = () => {
               <StyledDataGrid
                 rows={generateRows()}
                 columns={generateColumns()}
-                pageSize={10}
-                rowsPerPageOptions={[10, 25, 50]}
-                onSelectionModelChange={handleRowSelection}
-                selectionModel={selectedRows.map((row) => row.id)}
+                initialState={{
+                  pagination: {
+                    paginationModel: {
+                      pageSize: 15,
+                      page: 0,
+                    },
+                  },
+                }}
+                pageSizeOptions={[10, 15, 25, 50]}
+                onRowSelectionModelChange={handleRowSelection}
+                rowSelectionModel={selectedRows.map((row) => row.id)}
                 sx={{
-                  height: 450,
                   "& .MuiDataGrid-cell": {
                     transition: "background 0.2s",
                     "&:hover": {

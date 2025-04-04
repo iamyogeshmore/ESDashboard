@@ -37,6 +37,7 @@ import {
 const NAV_ITEMS = {
   dashboard: { path: "/", label: "Dashboard" },
   view: { path: "/terminal-view", label: "View" },
+  log: { path: "/log-view", label: "Log View" },
 };
 
 const Navbar = ({ toggleSidebar }) => {
@@ -178,6 +179,12 @@ const Navbar = ({ toggleSidebar }) => {
               sx={styles.menuItem}
             >
               Script View
+            </MenuItem>
+            <MenuItem
+              onClick={() => handleViewSelect("Log View", "/log-view")}
+              sx={styles.menuItem}
+            >
+              Log View
             </MenuItem>
           </Menu>
 

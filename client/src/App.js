@@ -14,7 +14,7 @@ import TableDetailsPage from "./pages/TableDetailsPage";
 import Viewer from "./pages/DashboardViewer"; // Import the new Viewer page
 import axios from "axios";
 import { preserveWidgetTemplatesAndClear } from "./components/localStorageUtils";
-
+import LogView from "./pages/LogView";
 const API_BASE_URL = `${process.env.REACT_APP_API_LOCAL_URL}api`;
 
 const App = () => {
@@ -108,7 +108,8 @@ const App = () => {
             <Route path="/hdd/table/:tableId" element={<TableDetailsPage />} />
             <Route path="/measurand-view" element={<MeasurandView />} />
             <Route path="/viewer" element={<Viewer />} />{" "}
-            {/* New Viewer Route */}
+            <Route path="/log-view" element={<LogView />} />{" "}
+            {/* New LogView Route */}{" "}
           </Routes>
         </Box>
         <Footer />

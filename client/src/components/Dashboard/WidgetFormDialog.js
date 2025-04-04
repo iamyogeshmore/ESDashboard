@@ -617,6 +617,14 @@ const WidgetFormDialog = ({
   // --------------------------- Function handles saving widget data after validation -------------------------------
   const handleSave = () => {
     if (validateForm()) {
+      const selectedPlant = plants.find((p) => p.PlantName === formData.plant);
+      const selectedTerminal = terminals.find(
+        (t) => t.TerminalName === formData.terminal
+      );
+      const selectedMeasurand = measurands.find(
+        (m) => m.MeasurandName === formData.measurement
+      );
+
       const widgetData = {
         ...formData,
         id: Date.now().toString(),
@@ -632,13 +640,15 @@ const WidgetFormDialog = ({
           w: 4,
           h: 4,
         },
+        plantId: selectedPlant ? selectedPlant.PlantId : "", // Add plantId
+        terminalId: selectedTerminal ? selectedTerminal.TerminalId : "", // Add terminalId
+        measurandId: selectedMeasurand ? selectedMeasurand.MeasurandId : "", // Add measurandId
       };
       handleSaveWidget(widgetData);
       setErrors({});
       onClose();
     }
   };
-
   return (
     <StyledDialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>

@@ -6,7 +6,7 @@ import { formatTimestamp } from "./formatTimestamp";
 const API_BASE_URL = `${process.env.REACT_APP_API_LOCAL_URL}api`;
 
 const DashboardNumberWidget = ({ data, width, height }) => {
-  const [value, setValue] = useState(null);
+  const [value, setValue] = useState(0); // Default to 0 instead of null
   const [timestamp, setTimestamp] = useState(null);
   const [isHovered, setIsHovered] = useState(false);
   const settings = data.settings || {};
@@ -14,23 +14,29 @@ const DashboardNumberWidget = ({ data, width, height }) => {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        const { plantId, terminalId, measurandId } = data;
+        if (!plantId || !terminalId || !measurandId) {
+          return; // Keep last value
+        }
+
         const response = await axios.get(
-          `${API_BASE_URL}/measurements/${data.plant}/${data.terminal}/${data.measurement}`
+          `${API_BASE_URL}/measurements/${plantId}/${terminalId}/${measurandId}`
         );
         const latestData = response.data[response.data.length - 1];
-        setValue(parseFloat(latestData.MeasurandValue) || 0);
-        setTimestamp(latestData.TimeStamp);
+        if (latestData) {
+          setValue(parseFloat(latestData.MeasurandValue) || 0);
+          setTimestamp(latestData.TimeStamp);
+        }
       } catch (error) {
-        console.error("Error fetching measurement data:", error);
-        setValue(0);
-        setTimestamp(null);
+        console.error("Error fetching measurement data:", error.message);
+        // Keep last value instead of resetting
       }
     };
 
     fetchData();
     const interval = setInterval(fetchData, 5000);
     return () => clearInterval(interval);
-  }, [data.plant, data.terminal, data.measurement]);
+  }, [data.plantId, data.terminalId, data.measurandId]);
 
   const tooltipTitle = `Last sync: ${formatTimestamp(timestamp)}`;
 
@@ -126,7 +132,7 @@ const DashboardNumberWidget = ({ data, width, height }) => {
               maxWidth: "100%",
             }}
           >
-            {value !== null ? value.toFixed(data.decimals || 2) : "Loading..."}
+            {value.toFixed(data.decimals || 2)}
           </Typography>
           {data.unit && (
             <Typography

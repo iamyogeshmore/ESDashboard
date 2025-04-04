@@ -17,7 +17,6 @@ import { styled } from "@mui/material/styles";
 import { ThemeContext } from "../../contexts/ThemeContext";
 import { formatTimestamp } from "./formatTimestamp";
 
-// --------------- Base API endpoint from environment variables ---------------
 const API_BASE_URL = `${process.env.REACT_APP_API_LOCAL_URL}api`;
 
 const StyledPaper = styled(Paper)(({ theme, settings }) => ({
@@ -54,7 +53,6 @@ const StyledHeaderCell = styled(TableCell)(({ theme, settings }) => ({
   textAlign: "center",
 }));
 
-// --------------------------- Function renders a data grid widget for the dashboard -------------------------------
 const DashboardDataGridWidget = ({
   data,
   width,
@@ -91,7 +89,7 @@ const DashboardDataGridWidget = ({
       Array(rows)
         .fill()
         .map(() =>
-          Array(measurandColumns).fill({ value: "--", timestamp: "", unit: "" })
+          Array(measurandColumns).fill({ value: "", timestamp: "", unit: "" })
         )
   );
 
@@ -103,15 +101,11 @@ const DashboardDataGridWidget = ({
     });
   }, [dashboardName, data]);
 
-  // --------------------------- Function saves selected plant, terminals, and measurements to the database -------------------------------
   const saveSelectionsToDB = useCallback(async () => {
     if (!dashboardName || !data.id) {
       console.error(
         "Cannot save selections: dashboardName or data.id is undefined",
-        {
-          dashboardName,
-          widgetId: data.id,
-        }
+        { dashboardName, widgetId: data.id }
       );
       return;
     }
@@ -134,7 +128,6 @@ const DashboardDataGridWidget = ({
     selectedMeasurements,
   ]);
 
-  // --------------------------- Function fetches plant data from the API -------------------------------
   const fetchPlants = useCallback(async () => {
     try {
       const response = await axios.get(`${API_BASE_URL}/plants`);
@@ -149,7 +142,6 @@ const DashboardDataGridWidget = ({
     }
   }, [selectedPlant]);
 
-  // --------------------------- Function fetches terminal data for a given plant -------------------------------
   const fetchTerminals = useCallback(
     async (plantName) => {
       if (!plantName) return;
@@ -170,7 +162,6 @@ const DashboardDataGridWidget = ({
     [rows, selectedTerminals]
   );
 
-  // --------------------------- Function fetches measurand data for a given plant and terminal -------------------------------
   const fetchMeasurands = useCallback(
     async (plantName, terminalName) => {
       if (!plantName || !terminalName) return;
@@ -193,13 +184,13 @@ const DashboardDataGridWidget = ({
     [measurandColumns, selectedMeasurements]
   );
 
-  // --------------------------- Function fetches measurement data for a specific plant, terminal, and measurand -------------------------------
-  const fetchMeasurementData = async (plant, terminal, measurand) => {
-    if (!plant || !terminal || !measurand)
-      return { value: "--", timestamp: "", unit: "" };
+  const fetchMeasurementData = async (plantId, terminalId, measurandId) => {
+    if (!plantId || !terminalId || !measurandId) {
+      return { value: "", timestamp: "", unit: "" };
+    }
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/measurements/${plant}/${terminal}/${measurand}`
+        `${API_BASE_URL}/measurements/${plantId}/${terminalId}/${measurandId}`
       );
       const data = response.data;
       if (data.length > 0) {
@@ -210,33 +201,20 @@ const DashboardDataGridWidget = ({
             latest.MeasurandValue !== null &&
             !isNaN(parseFloat(latest.MeasurandValue))
               ? parseFloat(latest.MeasurandValue)
-              : "--",
+              : "",
           timestamp: latest.TimeStamp || "",
           unit: latest.Unit || "",
         };
       }
-      return { value: "--", timestamp: "", unit: "" };
+      return { value: "", timestamp: "", unit: "" };
     } catch (error) {
       console.error(
-        `Error fetching data for ${plant}/${terminal}/${measurand}:`,
-        error
+        `Error fetching data for ${plantId}/${terminalId}/${measurandId}:`,
+        error.message
       );
-      return { value: "--", timestamp: "", unit: "" };
+      return { value: "", timestamp: "", unit: "" };
     }
   };
-
-  useEffect(() => {
-    if (!plants.length) fetchPlants();
-  }, [plants.length, fetchPlants]);
-
-  useEffect(() => {
-    if (selectedPlant) fetchTerminals(selectedPlant);
-  }, [selectedPlant, fetchTerminals]);
-
-  useEffect(() => {
-    if (selectedPlant && selectedTerminals[0])
-      fetchMeasurands(selectedPlant, selectedTerminals[0]);
-  }, [selectedPlant, selectedTerminals, fetchMeasurands]);
 
   useEffect(() => {
     let isMounted = true;
@@ -251,7 +229,7 @@ const DashboardDataGridWidget = ({
             .fill()
             .map(() =>
               Array(measurandColumns).fill({
-                value: "--",
+                value: "",
                 timestamp: "",
                 unit: "",
               })
@@ -260,14 +238,23 @@ const DashboardDataGridWidget = ({
         return;
       }
 
+      const plantId = plants.find(
+        (p) => p.PlantName === selectedPlant
+      )?.PlantId;
       const newData = await Promise.all(
         selectedTerminals.map(async (terminal) => {
+          const terminalId = terminals.find(
+            (t) => t.TerminalName === terminal
+          )?.TerminalId;
           const rowData = await Promise.all(
             selectedMeasurements.map(async (measurand) => {
+              const measurandId = measurands.find(
+                (m) => m.MeasurandName === measurand
+              )?.MeasurandId;
               return await fetchMeasurementData(
-                selectedPlant,
-                terminal,
-                measurand
+                plantId,
+                terminalId,
+                measurandId
               );
             })
           );
@@ -281,7 +268,7 @@ const DashboardDataGridWidget = ({
             ? newData
             : Array(rows).fill(
                 Array(measurandColumns).fill({
-                  value: "--",
+                  value: "",
                   timestamp: "",
                   unit: "",
                 })
@@ -304,9 +291,24 @@ const DashboardDataGridWidget = ({
     rows,
     measurandColumns,
     saveSelectionsToDB,
+    plants,
+    terminals,
+    measurands,
   ]);
 
-  // --------------------------- Function handles plant selection change -------------------------------
+  useEffect(() => {
+    if (!plants.length) fetchPlants();
+  }, [plants.length, fetchPlants]);
+
+  useEffect(() => {
+    if (selectedPlant) fetchTerminals(selectedPlant);
+  }, [selectedPlant, fetchTerminals]);
+
+  useEffect(() => {
+    if (selectedPlant && selectedTerminals[0])
+      fetchMeasurands(selectedPlant, selectedTerminals[0]);
+  }, [selectedPlant, selectedTerminals, fetchMeasurands]);
+
   const handlePlantChange = (_, value) => {
     setSelectedPlant(value);
     setSelectedTerminals(Array(rows).fill(""));
@@ -315,13 +317,12 @@ const DashboardDataGridWidget = ({
       Array(rows)
         .fill()
         .map(() =>
-          Array(measurandColumns).fill({ value: "--", timestamp: "", unit: "" })
+          Array(measurandColumns).fill({ value: "", timestamp: "", unit: "" })
         )
     );
     saveSelectionsToDB();
   };
 
-  // --------------------------- Function handles terminal selection change for a specific row -------------------------------
   const handleTerminalChange = (rowIdx, value) => {
     const newTerminals = [...selectedTerminals];
     newTerminals[rowIdx] = value;
@@ -329,7 +330,6 @@ const DashboardDataGridWidget = ({
     saveSelectionsToDB();
   };
 
-  // --------------------------- Function handles measurement selection change for a specific column -------------------------------
   const handleMeasurementChange = (colIdx, value) => {
     const newMeasurements = [...selectedMeasurements];
     newMeasurements[colIdx] = value;
@@ -337,7 +337,6 @@ const DashboardDataGridWidget = ({
     saveSelectionsToDB();
   };
 
-  // --------------------------- Function renders a dropdown for selecting plants, terminals, or measurements -------------------------------
   const renderDropdown = (type, value, options, onChange, index) => {
     if (isPublished) {
       return null;
@@ -408,7 +407,6 @@ const DashboardDataGridWidget = ({
     );
   };
 
-  // --------------------------- Function returns typography styles based on type (title or value) -------------------------------
   const getTypographyStyles = (type) => ({
     color:
       type === "title"
@@ -443,7 +441,6 @@ const DashboardDataGridWidget = ({
       settings={settings}
       sx={{ width: "100%", height: "100%", overflow: "auto" }}
     >
-      {/* --------------------------- Section for widget title and plant selection ------------------------------- */}
       <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
         <Typography sx={getTypographyStyles("title")}>{data.name}</Typography>
         {!isPublished && (
@@ -452,7 +449,6 @@ const DashboardDataGridWidget = ({
           </Box>
         )}
       </Box>
-      {/* --------------------------- Section for data grid table ------------------------------- */}
       <Table>
         <TableHead>
           <TableRow>
@@ -484,7 +480,7 @@ const DashboardDataGridWidget = ({
                         ? gridData?.[0]?.[i]?.unit
                           ? `${selectedMeasurements[i]} (${gridData[0][i].unit})`
                           : selectedMeasurements[i]
-                        : "--"}
+                        : ""}
                     </Typography>
                   )}
                 </StyledHeaderCell>
@@ -505,7 +501,7 @@ const DashboardDataGridWidget = ({
                     rowIdx
                   ) || (
                     <Typography sx={getTypographyStyles("title")}>
-                      {selectedTerminals[rowIdx] || "--"}
+                      {selectedTerminals[rowIdx] || ""}
                     </Typography>
                   )}
                 </StyledTableCell>
@@ -519,7 +515,7 @@ const DashboardDataGridWidget = ({
                 {gridData[rowIdx]?.map((cell, colIdx) => (
                   <StyledTableCell key={colIdx} settings={settings}>
                     <Typography sx={getTypographyStyles("value")}>
-                      {cell.value !== "--" ? `${cell.value.toFixed(2)}` : "--"}
+                      {cell.value !== "" ? `${cell.value.toFixed(2)}` : ""}
                     </Typography>
                   </StyledTableCell>
                 ))}

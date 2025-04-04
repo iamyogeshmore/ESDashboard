@@ -22,6 +22,7 @@ import {
   CircularProgress,
 } from "@mui/material";
 
+// Base URL for API calls
 const API_BASE_URL = `${process.env.REACT_APP_API_LOCAL_URL}api/hdd`;
 
 const CreateTableDialog = ({ open, onClose, onCreate }) => {
@@ -43,6 +44,7 @@ const CreateTableDialog = ({ open, onClose, onCreate }) => {
   });
   const [error, setError] = useState(null);
 
+  // Fetch plants when dialog opens
   useEffect(() => {
     if (open) {
       const fetchPlants = async () => {
@@ -50,7 +52,7 @@ const CreateTableDialog = ({ open, onClose, onCreate }) => {
         try {
           const response = await axios.get(`${API_BASE_URL}/plants`);
           if (!response.data.success) throw new Error(response.data.message);
-          setPlantOptions(response.data.data);
+          setPlantOptions(response.data.data); // Expecting [{ plantId, plantName }]
           setError(null);
         } catch (error) {
           console.error("Error fetching plants:", error);
@@ -63,6 +65,7 @@ const CreateTableDialog = ({ open, onClose, onCreate }) => {
     }
   }, [open]);
 
+  // Handle changes in form fields
   const handleNewTableChange = (field) => async (event) => {
     const value = event.target.value;
 
@@ -87,7 +90,12 @@ const CreateTableDialog = ({ open, onClose, onCreate }) => {
             `${API_BASE_URL}/terminals/${value}`
           );
           if (!response.data.success) throw new Error(response.data.message);
-          setTerminalOptions(response.data.data);
+          // Map backend response to match expected structure
+          const formattedTerminals = response.data.data.map((terminal) => ({
+            terminalId: terminal.terminalId || terminal.TerminalId,
+            terminalName: terminal.terminalName || terminal.TerminalName,
+          }));
+          setTerminalOptions(formattedTerminals);
           setError(null);
         } catch (error) {
           console.error("Error fetching terminals:", error);
@@ -117,7 +125,13 @@ const CreateTableDialog = ({ open, onClose, onCreate }) => {
             `${API_BASE_URL}/measurands/${newTable.plantId}/${value}`
           );
           if (!response.data.success) throw new Error(response.data.message);
-          setMeasurandOptions(response.data.data); // Now expects all measurands
+          // Map backend response to include unit
+          const formattedMeasurands = response.data.data.map((measurand) => ({
+            measurandId: measurand.measurandId || measurand.MeasurandId,
+            measurandName: measurand.measurandName || measurand.MeasurandName,
+            unit: measurand.unit || measurand.Unit || "",
+          }));
+          setMeasurandOptions(formattedMeasurands);
           setError(null);
         } catch (error) {
           console.error("Error fetching measurands:", error);
@@ -128,7 +142,7 @@ const CreateTableDialog = ({ open, onClose, onCreate }) => {
         }
       }
     } else if (field === "measurandIds") {
-      const selectedNames = value;
+      const selectedNames = value; // Array of selected measurandNames
       const selectedIds = measurandOptions
         .filter((option) => selectedNames.includes(option.measurandName))
         .map((option) => option.measurandId);
@@ -140,27 +154,32 @@ const CreateTableDialog = ({ open, onClose, onCreate }) => {
     }
   };
 
-  const handleCreate = () => {
+  // Handle table creation
+  const handleCreate = async () => {
     if (
       !newTable.plantId ||
       !newTable.terminalId ||
       !newTable.measurandIds.length
     ) {
-      onCreate({ error: "Please complete all table fields" });
+      setError("Please complete all required fields");
       return;
     }
-    const tableToCreate = {
-      plantId: newTable.plantId,
-      terminalId: newTable.terminalId,
-      measurandIds: newTable.measurandIds,
-      plantName: newTable.plantName,
-      terminalName: newTable.terminalName,
-      measurandNames: newTable.measurandNames,
-    };
-    onCreate(tableToCreate);
-    handleClose();
+
+    setLoading((prev) => ({ ...prev, plants: true }));
+    try {
+      const response = await axios.post(`${API_BASE_URL}/create`, newTable);
+      if (!response.data.success) throw new Error(response.data.message);
+      onCreate(response.data.data);
+      handleClose();
+    } catch (error) {
+      console.error("Error creating HDD view:", error);
+      setError(error.message || "Failed to create HDD view");
+    } finally {
+      setLoading((prev) => ({ ...prev, plants: false }));
+    }
   };
 
+  // Reset form and close dialog
   const handleClose = () => {
     setNewTable({
       plantId: "",
@@ -194,6 +213,7 @@ const CreateTableDialog = ({ open, onClose, onCreate }) => {
           </Typography>
         )}
         <Grid container spacing={3}>
+          {/* Plant Selection */}
           <Grid item xs={12}>
             <FormControl fullWidth disabled={loading.plants}>
               <InputLabel id="plant-label">Plant Name</InputLabel>
@@ -202,9 +222,6 @@ const CreateTableDialog = ({ open, onClose, onCreate }) => {
                 value={newTable.plantId}
                 label="Plant Name"
                 onChange={handleNewTableChange("plantId")}
-                endAdornment={
-                  loading.plants ? <CircularProgress size={20} /> : null
-                }
               >
                 <MenuItem value="">
                   <em>Select Plant</em>
@@ -215,9 +232,16 @@ const CreateTableDialog = ({ open, onClose, onCreate }) => {
                   </MenuItem>
                 ))}
               </Select>
+              {loading.plants && (
+                <CircularProgress
+                  size={20}
+                  sx={{ position: "absolute", right: 30, top: 15 }}
+                />
+              )}
             </FormControl>
           </Grid>
 
+          {/* Terminal Selection */}
           <Grid item xs={12}>
             <FormControl
               fullWidth
@@ -229,9 +253,6 @@ const CreateTableDialog = ({ open, onClose, onCreate }) => {
                 value={newTable.terminalId}
                 label="Terminal Name"
                 onChange={handleNewTableChange("terminalId")}
-                endAdornment={
-                  loading.terminals ? <CircularProgress size={20} /> : null
-                }
               >
                 <MenuItem value="">
                   <em>Select Terminal</em>
@@ -242,9 +263,16 @@ const CreateTableDialog = ({ open, onClose, onCreate }) => {
                   </MenuItem>
                 ))}
               </Select>
+              {loading.terminals && (
+                <CircularProgress
+                  size={20}
+                  sx={{ position: "absolute", right: 30, top: 15 }}
+                />
+              )}
             </FormControl>
           </Grid>
 
+          {/* Measurand Selection */}
           <Grid item xs={12}>
             <FormControl
               fullWidth
@@ -264,9 +292,6 @@ const CreateTableDialog = ({ open, onClose, onCreate }) => {
                     ))}
                   </Box>
                 )}
-                endAdornment={
-                  loading.measurands ? <CircularProgress size={20} /> : null
-                }
               >
                 {measurandOptions.map((option) => (
                   <MenuItem
@@ -282,6 +307,12 @@ const CreateTableDialog = ({ open, onClose, onCreate }) => {
                   </MenuItem>
                 ))}
               </Select>
+              {loading.measurands && (
+                <CircularProgress
+                  size={20}
+                  sx={{ position: "absolute", right: 30, top: 15 }}
+                />
+              )}
             </FormControl>
           </Grid>
         </Grid>
@@ -297,10 +328,11 @@ const CreateTableDialog = ({ open, onClose, onCreate }) => {
           disabled={
             !newTable.plantId ||
             !newTable.terminalId ||
-            !newTable.measurandIds.length
+            !newTable.measurandIds.length ||
+            loading.plants
           }
         >
-          Create Table
+          {loading.plants ? <CircularProgress size={20} /> : "Create Table"}
         </Button>
       </DialogActions>
     </Dialog>

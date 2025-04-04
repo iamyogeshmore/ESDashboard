@@ -305,7 +305,15 @@ const HDDView = () => {
                           color="text.secondary"
                           sx={{ mt: 1 }}
                         >
-                          Created: {new Date(table.createdAt).toLocaleString()}
+                          Created:
+                          {new Date(table.createdAt).toLocaleString("en-GB", {
+                            day: "2-digit",
+                            month: "2-digit",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            hour12: true,
+                          })}
                         </Typography>
                       </Box>
                     </CardContent>

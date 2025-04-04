@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { Box, CircularProgress, Switch, FormControlLabel } from "@mui/material";
+import { Box, Switch, FormControlLabel } from "@mui/material";
 import DashboardToolbar from "../components/Dashboard/DashboardToolbar";
 import DashboardGrid from "../components/Dashboard/DashboardGrid";
 import WidgetFormDialog from "../components/Dashboard/WidgetFormDialog";
@@ -50,7 +50,6 @@ const Dashboard = ({
   const [plants, setPlants] = useState([]);
   const [terminals, setTerminals] = useState([]);
   const [measurands, setMeasurands] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarSeverity, setSnackbarSeverity] = useState("success");
@@ -59,13 +58,12 @@ const Dashboard = ({
   const [originalWidgets, setOriginalWidgets] = useState([]);
   const [openPropertiesDialog, setOpenPropertiesDialog] = useState(false);
   const [selectedWidgetId, setSelectedWidgetId] = useState(null);
-  const [selectedWidgetData, setSelectedWidgetData] = useState(null); // Added to store full widget data
+  const [selectedWidgetData, setSelectedWidgetData] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
     const loadInitialDashboard = async () => {
       try {
-        setLoading(true);
         const response = await axios.get(`${API_BASE_URL}/dashboards/active`);
         if (response.data) {
           setWidgets(response.data.widgets || []);
@@ -94,8 +92,6 @@ const Dashboard = ({
         setOriginalWidgets(storedWidgets);
         setIsPublished(false);
         setDashboardName("");
-      } finally {
-        setLoading(false);
       }
     };
 
@@ -173,14 +169,13 @@ const Dashboard = ({
   };
 
   const handleSettingsClick = (widgetId) => {
-    const widget = widgets.find((w) => w.id === widgetId); // Find the full widget data
+    const widget = widgets.find((w) => w.id === widgetId);
     setSelectedWidgetId(widgetId);
-    setSelectedWidgetData(widget); // Store the full widget object
+    setSelectedWidgetData(widget);
     setOpenPropertiesDialog(true);
   };
 
   const handleApplySettings = async (settings, applyToAll) => {
-    // Updated to handle applyToAll option
     const updatedWidgets = widgets.map((widget) =>
       applyToAll || widget.id === selectedWidgetId
         ? { ...widget, settings }
@@ -201,7 +196,7 @@ const Dashboard = ({
     }
     setOpenPropertiesDialog(false);
     setSelectedWidgetId(null);
-    setSelectedWidgetData(null); // Clear after applying
+    setSelectedWidgetData(null);
   };
 
   const triggerSnackbar = (message, severity = "success") => {
@@ -232,13 +227,13 @@ const Dashboard = ({
     }
   };
 
-  const handleSaveWidget = async () => {
+  const handleSaveWidget = async (widgetData) => {
     const newWidget = {
-      id: Date.now().toString(), // Ensure string ID for GridLayout compatibility
+      id: Date.now().toString(),
       type: widgetType,
-      ...formData,
+      ...widgetData,
       measurands,
-      settings: { ...customDefaultWidgetSettings }, // Apply default settings
+      settings: { ...customDefaultWidgetSettings },
       layout: {
         i: Date.now().toString(),
         x: 0,
@@ -246,18 +241,29 @@ const Dashboard = ({
         w: widgetType === "datagrid" ? 6 : 3,
         h: widgetType === "datagrid" ? 6 : 4,
       },
+      plantId: widgetData.plantId || "",
+      terminalId: widgetData.terminalId || "",
+      measurandId: widgetData.measurandId || "",
     };
     try {
       const updatedWidgets = [...widgets, newWidget];
       setWidgets(updatedWidgets);
       localStorage.setItem("dashboardWidgets", JSON.stringify(updatedWidgets));
+
+      if (dashboardName) {
+        await axios.post(
+          `${API_BASE_URL}/dashboards/${dashboardName}/widgets`,
+          newWidget
+        );
+      }
+
       setOpenWidgetDialog(false);
       setFormData({});
       triggerSnackbar(
         `Widget "${newWidget.name || widgetType}" created successfully`
       );
     } catch (error) {
-      console.error("Error saving widget to localStorage:", error);
+      console.error("Error saving widget:", error);
       triggerSnackbar("Failed to add widget", "error");
     }
   };
@@ -392,21 +398,6 @@ const Dashboard = ({
     setDeleteDialogOpen(true);
   };
 
-  if (loading) {
-    return (
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          height: "100vh",
-        }}
-      >
-        <CircularProgress />
-      </Box>
-    );
-  }
-
   return (
     <Box sx={{ flexGrow: 1, minHeight: "calc(100vh - 128px)", padding: 2 }}>
       {isEditing && (
@@ -488,9 +479,9 @@ const Dashboard = ({
               setSelectedWidgetData(null);
             }}
             selectedWidgetId={selectedWidgetId}
-            widgetData={selectedWidgetData} // Pass full widget data
+            widgetData={selectedWidgetData}
             handleApplySettings={handleApplySettings}
-            viewId={dashboardName} // Pass dashboardName as viewId
+            viewId={dashboardName}
           />
         </>
       )}

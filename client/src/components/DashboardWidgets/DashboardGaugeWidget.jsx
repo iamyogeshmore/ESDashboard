@@ -20,7 +20,6 @@ import { formatTimestamp } from "./formatTimestamp";
 
 ChartJS.register(ArcElement, ChartTooltip, Legend);
 
-// --------------- Base API endpoint from environment variables ---------------
 const API_BASE_URL = `${process.env.REACT_APP_API_LOCAL_URL}api`;
 
 const StyledCard = styled(Card)(({ theme, settings }) => ({
@@ -45,7 +44,6 @@ const GaugeContainer = styled(Box)({
   alignItems: "center",
 });
 
-// --------------------------- Function renders a gauge widget for the dashboard -------------------------------
 const DashboardGaugeWidget = ({ data, width, height }) => {
   const theme = useTheme();
   const settings = data.settings || {};
@@ -53,18 +51,16 @@ const DashboardGaugeWidget = ({ data, width, height }) => {
     value: 0,
     timestamp: null,
   });
-  const [error, setError] = useState(null);
 
-  // --------------------------- Function fetches measurement data from the API -------------------------------
   const fetchMeasurementData = useCallback(async () => {
     try {
-      const { plant, terminal, measurement } = data;
-      if (!plant || !terminal || !measurement) {
-        throw new Error("Missing required widget configuration");
+      const { plantId, terminalId, measurandId } = data;
+      if (!plantId || !terminalId || !measurandId) {
+        return;
       }
 
       const response = await axios.get(
-        `${API_BASE_URL}/measurements/${plant}/${terminal}/${measurement}`
+        `${API_BASE_URL}/measurements/${plantId}/${terminalId}/${measurandId}`
       );
 
       const latestData = response.data[0];
@@ -74,10 +70,8 @@ const DashboardGaugeWidget = ({ data, width, height }) => {
           timestamp: latestData.TimeStamp,
         });
       }
-      setError(null);
     } catch (err) {
-      console.error("Error fetching measurement data:", err);
-      setError("Failed to fetch data");
+      console.error("Error fetching measurement data:", err.message);
     }
   }, [data]);
 
@@ -87,7 +81,6 @@ const DashboardGaugeWidget = ({ data, width, height }) => {
     return () => clearInterval(interval);
   }, [data.plant, data.terminal, data.measurement, fetchMeasurementData]);
 
-  // --------------------------- Function calculates gauge values and configurations -------------------------------
   const minValue = data.minRange || 0;
   const maxValue = data.maxRange || 100;
   const displayValue = Math.max(
@@ -107,7 +100,6 @@ const DashboardGaugeWidget = ({ data, width, height }) => {
     { start: minValue + (2 * range) / 3, end: maxValue, color: "#4caf50" },
   ];
 
-  // --------------------------- Function determines the gauge color based on value ranges -------------------------------
   const getGaugeColor = () => {
     for (const range of ranges) {
       if (displayValue >= range.start && displayValue <= range.end) {
@@ -158,7 +150,6 @@ const DashboardGaugeWidget = ({ data, width, height }) => {
             paddingBottom: 0,
           }}
         >
-          {/* --------------------------- Section for gauge widget title ------------------------------- */}
           <Typography
             sx={{
               fontWeight: settings.titleFontWeight || "normal",
@@ -173,7 +164,6 @@ const DashboardGaugeWidget = ({ data, width, height }) => {
           >
             {data.name || "Gauge Widget"}
           </Typography>
-          {/* --------------------------- Section for gauge chart and value display ------------------------------- */}
           <GaugeContainer>
             <Box sx={{ position: "relative", width: "100%", height: "100%" }}>
               <Doughnut
@@ -196,7 +186,7 @@ const DashboardGaugeWidget = ({ data, width, height }) => {
                   textDecoration: settings.valueTextDecoration || "none",
                 }}
               >
-                {error ? "Error" : displayValue.toFixed(data.decimals || 1)}
+                {displayValue.toFixed(data.decimals || 1)}
               </Typography>
               {data.unit && (
                 <Typography
