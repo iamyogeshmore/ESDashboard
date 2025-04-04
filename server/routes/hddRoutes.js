@@ -31,7 +31,7 @@ router.get(
 
 // -------------------- 9. Get Measurement Data for Graph --------------------
 router.get(
-  "/graph/:terminalName/:measurandName",
+  "/graph/:terminalId/:measurandId",
   hddController.getHistoricalMeasurandValuesForGraph
 );
 

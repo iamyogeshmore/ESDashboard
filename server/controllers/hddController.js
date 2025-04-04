@@ -1,8 +1,7 @@
 const NodeCache = require("node-cache");
 const ESPlantTerminalHD900 = require("../models/ESPlantTerminalHD900");
 const HDDViews = require("../models/HDDViews");
-const ESPlantTerminal = require("../models/ESPlantTerminal");
-
+const ESPlant = require("../models/ESPlant");
 const log = {
   info: (msg) => console.log(`[INFO] ${new Date().toISOString()} - ${msg}`),
   error: (msg) => console.error(`[ERROR] ${new Date().toISOString()} - ${msg}`),
@@ -204,14 +203,11 @@ exports.deleteHDDView = async (req, res) => {
   }
 };
 
-// -------------------- 5. Get unique plant names --------------------
 exports.getPlants = async (req, res) => {
   try {
-    const plantIds = await withRetry(async () => {
-      return await ESPlantTerminal.distinct("PlantId").lean().exec();
-    });
+    const plants = await ESPlant.find().select("_id PlantName").lean();
 
-    if (!plantIds || plantIds.length === 0) {
+    if (!plants.length) {
       return res.status(200).json({
         success: true,
         message: "No plants found",
@@ -219,34 +215,16 @@ exports.getPlants = async (req, res) => {
       });
     }
 
-    const plantDetails = await withRetry(async () => {
-      const details = await Promise.all(
-        plantIds.map(async (plantId) => {
-          const doc = await ESPlantTerminal.findOne({ PlantId: plantId })
-            .select("PlantId PlantName")
-            .lean()
-            .exec();
-          if (!doc) {
-            log.warn(`No document found for PlantId: ${plantId}`);
-            return null;
-          }
-          return {
-            plantId: doc.PlantId,
-            plantName: doc.PlantName,
-          };
-        })
-      );
-      return details.filter((detail) => detail !== null);
-    });
-
     res.status(200).json({
       success: true,
       message: "Plants retrieved successfully",
-      data: plantDetails,
-      total: plantDetails.length,
+      data: plants.map((plant) => ({
+        plantId: plant._id,
+        plantName: plant.PlantName,
+      })),
+      total: plants.length,
     });
   } catch (error) {
-    log.error(`Error fetching plants: ${error.message}`);
     res.status(500).json({
       success: false,
       message: "Failed to fetch plants",
@@ -255,168 +233,103 @@ exports.getPlants = async (req, res) => {
   }
 };
 
-// -------------------- 6. Get unique terminal names for a plant --------------------
+// 6. Get unique terminal names for a plant
 exports.getTerminals = async (req, res) => {
   const { plantId } = req.params;
 
   try {
-    if (!plantId || isNaN(plantId)) {
-      return res.status(400).json({
+    if (!plantId) {
+      return res.status(400).JSONArray({
         success: false,
-        message: "Invalid or missing plantId parameter",
+        message: "Missing plantId parameter",
       });
     }
 
     const numericPlantId = Number(plantId);
+    if (isNaN(numericPlantId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid plantId format. Must be a number.",
+      });
+    }
 
-    const plantExists = await withRetry(async () => {
-      return await ESPlantTerminal.findOne({ PlantId: numericPlantId }).lean();
-    });
-    if (!plantExists) {
-      log.info(`No terminals found for PlantId: ${numericPlantId}`);
+    const plant = await ESPlant.findById(numericPlantId)
+      .select("TerminalList PlantName")
+      .lean();
+
+    if (!plant || !plant.TerminalList.length) {
       return res.status(404).json({
         success: false,
-        message: `No terminals found for PlantId: ${numericPlantId}`,
+        message: `No terminals found for PlantId: ${plantId}`,
       });
     }
-
-    const terminalIDs = await withRetry(async () => {
-      return await ESPlantTerminal.distinct("TerminalID", {
-        PlantId: numericPlantId,
-      })
-        .lean()
-        .exec();
-    });
-
-    if (!terminalIDs || terminalIDs.length === 0) {
-      log.info(`No terminals found for PlantId: ${numericPlantId}`);
-      return res.status(200).json({
-        success: true,
-        message: `No terminals found for PlantId: ${numericPlantId}`,
-        data: [],
-      });
-    }
-
-    const terminalDetails = await withRetry(async () => {
-      const details = await Promise.all(
-        terminalIDs.map(async (terminalID) => {
-          const doc = await ESPlantTerminal.findOne({
-            TerminalID: terminalID,
-            PlantId: numericPlantId,
-          })
-            .select("TerminalID TerminalName")
-            .lean()
-            .exec();
-          if (!doc) {
-            log.warn(
-              `No document found for TerminalID: ${terminalID} under PlantId: ${numericPlantId}`
-            );
-            return null;
-          }
-          return {
-            terminalId: doc.TerminalID,
-            terminalName: doc.TerminalName,
-          };
-        })
-      );
-      return details.filter((detail) => detail !== null);
-    });
 
     res.status(200).json({
       success: true,
-      message: `Terminals retrieved successfully for PlantId: ${numericPlantId}`,
-      data: terminalDetails,
-      total: terminalDetails.length,
+      message: `Terminals retrieved successfully for Plant: ${plant.PlantName}`,
+      data: plant.TerminalList,
+      total: plant.TerminalList.length,
     });
   } catch (error) {
-    log.error(
-      `Error fetching terminals for PlantId ${plantId}: ${error.message}`
-    );
     res.status(500).json({
       success: false,
-      message: "Failed to fetch terminals",
+      message: "Failed to fetch terminal list",
       error: error.message,
     });
   }
 };
 
-// -------------------- 7. Get unique measurand names for a plant and terminal --------------------
+// 7. Get measurands by plantId and terminalId
+// controllers/hddController.js (only updating getMeasurands function)
 exports.getMeasurands = async (req, res) => {
   const { plantId, terminalId } = req.params;
 
   try {
-    if (!plantId || isNaN(plantId) || !terminalId || isNaN(terminalId)) {
+    if (!plantId || !terminalId) {
       return res.status(400).json({
         success: false,
-        message: "Invalid or missing plantId or terminalId parameter",
+        message: "Missing plantId or terminalId parameter",
       });
     }
 
     const numericPlantId = Number(plantId);
     const numericTerminalId = Number(terminalId);
 
-    const exists = await withRetry(async () => {
-      return await ESPlantTerminal.findOne({
-        PlantId: numericPlantId,
-        TerminalID: numericTerminalId,
-      }).lean();
-    });
-    if (!exists) {
-      log.info(
-        `No measurands found for PlantId: ${numericPlantId}, TerminalID: ${numericTerminalId}`
-      );
+    if (isNaN(numericPlantId) || isNaN(numericTerminalId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid plantId or terminalId format. Must be numbers.",
+      });
+    }
+
+    const plant = await ESPlant.findOne({
+      _id: numericPlantId,
+      "TerminalList.TerminalId": numericTerminalId,
+    })
+      .select("MeasurandList PlantName TerminalList")
+      .lean();
+
+    if (!plant) {
       return res.status(404).json({
         success: false,
-        message: `No measurands found for PlantId: ${numericPlantId} and TerminalID: ${numericTerminalId}`,
+        message: `No data found for PlantId: ${plantId} and TerminalId: ${terminalId}`,
       });
     }
 
-    // Fetch all documents matching plantId and terminalId
-    const measurandDocs = await withRetry(async () => {
-      return await ESPlantTerminal.find({
-        PlantId: numericPlantId,
-        TerminalID: numericTerminalId,
-      })
-        .select("MeasurandDetails.MeasurandId MeasurandDetails.MeasurandName")
-        .lean()
-        .exec();
-    });
-
-    if (!measurandDocs || measurandDocs.length === 0) {
-      return res.status(200).json({
-        success: true,
-        message: `No measurands found for PlantId: ${numericPlantId} and TerminalID: ${numericTerminalId}`,
-        data: [],
-      });
-    }
-
-    // Extract and deduplicate measurand details
-    const measurandDetailsSet = new Set();
-    const measurandDetails = [];
-
-    measurandDocs.forEach((doc) => {
-      if (doc.MeasurandDetails) {
-        const key = `${doc.MeasurandDetails.MeasurandId}:${doc.MeasurandDetails.MeasurandName}`;
-        if (!measurandDetailsSet.has(key)) {
-          measurandDetailsSet.add(key);
-          measurandDetails.push({
-            measurandId: doc.MeasurandDetails.MeasurandId,
-            measurandName: doc.MeasurandDetails.MeasurandName,
-          });
-        }
-      }
-    });
+    // Format the response to ensure MeasurandName is properly structured
+    const measurands = plant.MeasurandList.map((measurand) => ({
+      measurandId: measurand.MeasurandId,
+      measurandName: measurand.MeasurandName,
+      unit: measurand.Unit || "",
+    }));
 
     res.status(200).json({
       success: true,
-      message: `Measurands retrieved successfully for PlantId: ${numericPlantId} and TerminalID: ${numericTerminalId}`,
-      data: measurandDetails,
-      total: measurandDetails.length,
+      message: `Measurands retrieved successfully for Plant: ${plant.PlantName}`,
+      data: measurands,
+      total: measurands.length,
     });
   } catch (error) {
-    log.error(
-      `Error fetching measurands for PlantId ${plantId}, TerminalID ${terminalId}: ${error.message}`
-    );
     res.status(500).json({
       success: false,
       message: "Failed to fetch measurands",
@@ -519,21 +432,29 @@ exports.getHistoricalMeasurandValues = async (req, res) => {
 };
 
 // -------------------- 9. Get measurand values for graph --------------------
+// -------------------- 9. Get measurand values for graph by terminalId and measurandId --------------------
 exports.getHistoricalMeasurandValuesForGraph = async (req, res) => {
-  const { terminalName, measurandName } = req.params; // Removed plantName
-  const { from, to } = req.query;
+  const { terminalId, measurandId } = req.params;
 
   try {
-    if (!terminalName || !measurandName) {
+    if (!terminalId || !measurandId) {
       return res.status(400).json({
         success: false,
-        message: "Missing required fields: terminalName or measurandName",
+        message: "Missing required fields: terminalId or measurandId",
       });
     }
 
-    const cacheKey = `${terminalName}:${measurandName}:${from || "no-from"}:${
-      to || "no-to"
-    }`;
+    const numericTerminalId = Number(terminalId);
+    const numericMeasurandId = Number(measurandId);
+
+    if (isNaN(numericTerminalId) || isNaN(numericMeasurandId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid terminalId or measurandId format. Must be numbers.",
+      });
+    }
+
+    const cacheKey = `${numericTerminalId}:${numericMeasurandId}`;
     const cachedData = graphCache.get(cacheKey);
     if (cachedData) {
       log.info(`Cache hit for graph data: ${cacheKey}`);
@@ -546,13 +467,9 @@ exports.getHistoricalMeasurandValuesForGraph = async (req, res) => {
     }
 
     const queryConditions = {
-      TerminalName: terminalName,
-      "MeasurandData.MeasurandName": measurandName,
+      TerminalId: numericTerminalId,
+      "MeasurandData.MeasurandId": numericMeasurandId,
     };
-
-    if (from && to) {
-      queryConditions.TimeStamp = { $gte: from, $lte: to };
-    }
 
     const data = await withRetry(async () => {
       const startTime = Date.now();
@@ -578,7 +495,7 @@ exports.getHistoricalMeasurandValuesForGraph = async (req, res) => {
     }
 
     const formattedData = data.flatMap((d) =>
-      d.MeasurandData.filter((m) => m.MeasurandName === measurandName).map(
+      d.MeasurandData.filter((m) => m.MeasurandId === numericMeasurandId).map(
         (m) => ({
           Timestamp: d.TimeStamp,
           MeasurandValue: m.MeasurandValue,

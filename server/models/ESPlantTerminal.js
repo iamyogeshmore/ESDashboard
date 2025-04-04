@@ -42,7 +42,7 @@ const ESPlantTerminalSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
-    TerminalID: {
+    TerminalId: {
       type: Number,
       required: true,
       index: true,

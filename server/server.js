@@ -9,6 +9,7 @@ const plantRoutes = require("./routes/plantRoutes");
 const viewRoutes = require("./routes/viewRoutes");
 const hddRoutes = require("./routes/hddRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
+const queryRoutes = require("./routes/logRoutes");
 
 const app = express();
 
@@ -17,20 +18,7 @@ app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use(
   cors({
-    origin: (origin, callback) => {
-      const allowedOrigins = [
-        "https://estheormdashboard.netlify.app",
-        "http://localhost:5006",
-        "http://localhost:5005",
-        "http://192.168.1.110:5006", // Add client PC if running frontend locally
-        "http://10.10.10.101:5006", // Add client PC if running frontend locally
-      ];
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
+    origin: "*", // Allow all origins
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
@@ -117,6 +105,7 @@ app.use("/api", plantRoutes);
 app.use("/api", viewRoutes);
 app.use("/api/hdd", hddRoutes);
 app.use("/api", dashboardRoutes);
+app.use("/api", queryRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

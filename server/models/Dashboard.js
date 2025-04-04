@@ -10,6 +10,9 @@ const WidgetSchema = new mongoose.Schema({
   plant: String,
   terminal: String,
   measurement: String,
+  plantId: { type: String }, // Add plantId
+  terminalId: { type: String }, // Add terminalId
+  measurandId: { type: String }, // Add measurandId
   name: String,
   unit: String,
   decimals: Number,

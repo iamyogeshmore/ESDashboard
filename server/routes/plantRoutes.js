@@ -16,7 +16,7 @@ router.get(
 
 // -------------------- 4. Get Measurement Data --------------------
 router.get(
-  "/measurements/:plantName/:terminalName/:measurandName",
+  "/measurements/:plantId/:terminalId/:measurandId",
   plantController.getMeasurementData
 );
 

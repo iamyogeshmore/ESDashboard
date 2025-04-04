@@ -108,6 +108,9 @@ exports.createWidget = async (req, res) => {
       selectedPlant: widgetData.selectedPlant || "",
       selectedTerminals: widgetData.selectedTerminals || [],
       selectedMeasurements: widgetData.selectedMeasurements || [],
+      plantId: widgetData.plantId || "", // Save plantId
+      terminalId: widgetData.terminalId || "", // Save terminalId
+      measurandId: widgetData.measurandId || "", // Save measurandId
     };
 
     dashboard.widgets.push(newWidget);
@@ -118,7 +121,6 @@ exports.createWidget = async (req, res) => {
     return { status: 500, error: "Server error", message: error.message };
   }
 };
-
 // -------------------- 7. Deletes a specific widget from a dashboard by widget ID --------------------
 exports.deleteWidget = async (req, res) => {
   try {
