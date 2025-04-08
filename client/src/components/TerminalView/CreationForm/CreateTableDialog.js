@@ -22,7 +22,7 @@ import {
   CircularProgress,
 } from "@mui/material";
 
-// Base URL for API calls
+// ------------------ Base API endpoint from environment variables ------------------
 const API_BASE_URL = `${process.env.REACT_APP_API_LOCAL_URL}api/hdd`;
 
 const CreateTableDialog = ({ open, onClose, onCreate }) => {
@@ -44,7 +44,7 @@ const CreateTableDialog = ({ open, onClose, onCreate }) => {
   });
   const [error, setError] = useState(null);
 
-  // Fetch plants when dialog opens
+  // ----------------------- Fetch Plants Effect ---------------------
   useEffect(() => {
     if (open) {
       const fetchPlants = async () => {
@@ -52,7 +52,7 @@ const CreateTableDialog = ({ open, onClose, onCreate }) => {
         try {
           const response = await axios.get(`${API_BASE_URL}/plants`);
           if (!response.data.success) throw new Error(response.data.message);
-          setPlantOptions(response.data.data); // Expecting [{ plantId, plantName }]
+          setPlantOptions(response.data.data);
           setError(null);
         } catch (error) {
           console.error("Error fetching plants:", error);
@@ -65,7 +65,7 @@ const CreateTableDialog = ({ open, onClose, onCreate }) => {
     }
   }, [open]);
 
-  // Handle changes in form fields
+  // ----------------------- Handle Form Field Changes ---------------------
   const handleNewTableChange = (field) => async (event) => {
     const value = event.target.value;
 
@@ -90,7 +90,6 @@ const CreateTableDialog = ({ open, onClose, onCreate }) => {
             `${API_BASE_URL}/terminals/${value}`
           );
           if (!response.data.success) throw new Error(response.data.message);
-          // Map backend response to match expected structure
           const formattedTerminals = response.data.data.map((terminal) => ({
             terminalId: terminal.terminalId || terminal.TerminalId,
             terminalName: terminal.terminalName || terminal.TerminalName,
@@ -125,7 +124,6 @@ const CreateTableDialog = ({ open, onClose, onCreate }) => {
             `${API_BASE_URL}/measurands/${newTable.plantId}/${value}`
           );
           if (!response.data.success) throw new Error(response.data.message);
-          // Map backend response to include unit
           const formattedMeasurands = response.data.data.map((measurand) => ({
             measurandId: measurand.measurandId || measurand.MeasurandId,
             measurandName: measurand.measurandName || measurand.MeasurandName,
@@ -142,7 +140,7 @@ const CreateTableDialog = ({ open, onClose, onCreate }) => {
         }
       }
     } else if (field === "measurandIds") {
-      const selectedNames = value; // Array of selected measurandNames
+      const selectedNames = value;
       const selectedIds = measurandOptions
         .filter((option) => selectedNames.includes(option.measurandName))
         .map((option) => option.measurandId);
@@ -154,7 +152,7 @@ const CreateTableDialog = ({ open, onClose, onCreate }) => {
     }
   };
 
-  // Handle table creation
+  // ----------------------- Handle Table Creation ---------------------
   const handleCreate = async () => {
     if (
       !newTable.plantId ||
@@ -179,7 +177,7 @@ const CreateTableDialog = ({ open, onClose, onCreate }) => {
     }
   };
 
-  // Reset form and close dialog
+  // ----------------------- Handle Dialog Close ---------------------
   const handleClose = () => {
     setNewTable({
       plantId: "",

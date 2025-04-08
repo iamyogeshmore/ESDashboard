@@ -30,6 +30,7 @@ import {
 import CreateTableDialog from "../CreationForm/CreateTableDialog";
 import DeleteConfirmationDialog from "../../DeleteConfirmationDialog";
 
+// ------------------ Base API endpoint from environment variables ------------------
 const BASE_URL = `${process.env.REACT_APP_API_LOCAL_URL}api/hdd`;
 
 const AnimatedCard = styled(Card)(({ theme }) => ({
@@ -85,6 +86,7 @@ const HDDView = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // ----------------------- Fetch Tables ---------------------
   const fetchTables = useCallback(async () => {
     try {
       setLoading(true);
@@ -105,6 +107,7 @@ const HDDView = () => {
     }
   }, []);
 
+  // ----------------------- Handle Table Creation ---------------------
   const handleTableCreate = async (tableData) => {
     if (tableData.error) {
       setSnackbar({
@@ -135,6 +138,7 @@ const HDDView = () => {
     }
   };
 
+  // ----------------------- Handle Table Deletion ---------------------
   const handleDeleteTable = async () => {
     if (!tableToDelete) return;
 
@@ -160,30 +164,37 @@ const HDDView = () => {
     }
   };
 
+  // ----------------------- Fetch Tables Effect ---------------------
   useEffect(() => {
     fetchTables();
   }, [fetchTables]);
 
+  // ----------------------- Handle Add Table ---------------------
   const handleAddTable = () => setTableDialogOpen(true);
 
+  // ----------------------- Handle Table Click ---------------------
   const handleTableClick = (tableId) => {
     navigate(`/hdd/table/${tableId}`);
   };
 
+  // ----------------------- Handle Delete Click ---------------------
   const handleDeleteClick = (tableId) => {
     setTableToDelete(tableId);
     setDeleteDialogOpen(true);
   };
 
+  // ----------------------- Handle Delete Dialog Close ---------------------
   const handleDeleteDialogClose = () => {
     setDeleteDialogOpen(false);
     setTableToDelete(null);
   };
 
+  // ----------------------- Handle Snackbar Close ---------------------
   const handleSnackbarClose = () => {
     setSnackbar((prev) => ({ ...prev, open: false }));
   };
 
+  // ----------------------- Transition Slide ---------------------
   const TransitionSlide = (props) => <Slide {...props} direction="left" />;
 
   if (loading) {

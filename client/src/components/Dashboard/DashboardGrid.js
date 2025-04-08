@@ -22,10 +22,14 @@ const DashboardGrid = ({
   dashboardName,
   isPublished,
 }) => {
+  // ----------------------- Widget Rendering Function ---------------------
+  // renderWidget: Renders individual widgets based on their type
+  // Calculates pixel dimensions and enhances widget data with default arrays
   const renderWidget = (widget) => {
-    const pixelWidth = widget.layout.w * ((window.innerWidth - 48) / 12);
-    const pixelHeight = widget.layout.h * 50;
+    const pixelWidth = widget.layout.w * ((window.innerWidth - 48) / 12); // Convert grid width to pixels
+    const pixelHeight = widget.layout.h * 50; // Convert grid height to pixels
 
+    // Enhance widget data with default empty arrays if properties are undefined
     const enhancedData = {
       ...widget,
       plants: widget.plants || [],
@@ -44,6 +48,7 @@ const DashboardGrid = ({
         }}
       >
         {(() => {
+          // ----------------------- Widget Type Switch ---------------------
           switch (widget.type) {
             case "number":
               return (
@@ -157,8 +162,8 @@ const DashboardGrid = ({
       rowHeight={50}
       width={window.innerWidth - 48}
       onLayoutChange={onLayoutChange}
-      isResizable={!isPublished} // Explicitly disable resizing in published mode
-      isDraggable={!isPublished} // Explicitly disable dragging in published mode
+      isResizable={!isPublished}
+      isDraggable={!isPublished}
       compactType="vertical"
       preventCollision={false}
     >

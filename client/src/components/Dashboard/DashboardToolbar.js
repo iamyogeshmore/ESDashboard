@@ -9,6 +9,7 @@ import {
   Typography,
   Chip,
   Paper,
+  CircularProgress, // Import CircularProgress for loading animation
 } from "@mui/material";
 import {
   TextFields as TextIcon,
@@ -21,7 +22,6 @@ import {
   Publish as PublishIcon,
 } from "@mui/icons-material";
 
-// --------------------------- Function renders the dashboard toolbar with widget controls -------------------------------
 const DashboardToolbar = ({
   dashboardName,
   isPublished,
@@ -29,6 +29,8 @@ const DashboardToolbar = ({
   handleIconClick,
   handleSave,
   handlePublish,
+  loadingSave = false, // New prop for Save/Update button loading state
+  loadingPublish = false, // New prop for Publish button loading state
 }) => (
   <Paper elevation={2} sx={{ mb: 3, overflow: "hidden" }}>
     <AppBar position="static" color="default" elevation={0}>
@@ -81,7 +83,7 @@ const DashboardToolbar = ({
           </Tooltip>
         </Box>
 
-        {/* ------------------ Dashboard title and status ------------- */}
+        {/* Dashboard title and status */}
         <Box
           sx={{
             flexGrow: 1,
@@ -102,7 +104,6 @@ const DashboardToolbar = ({
               sx={{ mr: 1, height: 22, fontSize: "0.7rem" }}
             />
           )}
-          {/* Show "Published" chip if dashboard is published */}
           {isPublished && (
             <Chip
               label="Published"
@@ -114,15 +115,21 @@ const DashboardToolbar = ({
           )}
         </Box>
 
-        {/* ------------------ Save and Publish buttons ------------- */}
+        {/* Save and Publish buttons with loading animations */}
         <Box sx={{ display: "flex", alignItems: "center" }}>
           <Button
             variant="contained"
             color="primary"
-            startIcon={<SaveIcon />}
+            startIcon={
+              loadingSave ? (
+                <CircularProgress size={20} color="inherit" />
+              ) : (
+                <SaveIcon />
+              )
+            }
             sx={{ ml: 1, textTransform: "none" }}
             onClick={handleSave}
-            disabled={!hasChanges}
+            disabled={!hasChanges || loadingSave} // Disable during loading
           >
             {dashboardName ? "Update" : "Save"}
           </Button>
@@ -138,10 +145,16 @@ const DashboardToolbar = ({
               <Button
                 variant="outlined"
                 color="secondary"
-                startIcon={<PublishIcon />}
+                startIcon={
+                  loadingPublish ? (
+                    <CircularProgress size={20} color="inherit" />
+                  ) : (
+                    <PublishIcon />
+                  )
+                }
                 sx={{ ml: 1, textTransform: "none" }}
                 onClick={handlePublish}
-                disabled={!dashboardName || isPublished}
+                disabled={!dashboardName || isPublished || loadingPublish} // Disable during loading
               >
                 Publish
               </Button>

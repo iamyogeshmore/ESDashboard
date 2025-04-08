@@ -39,8 +39,9 @@ import CreateWidgetDialog from "../CreationForm/CreateWidgetDialog";
 import DeleteConfirmationDialog from "../../DeleteConfirmationDialog";
 import SaveIcon from "@mui/icons-material/Save";
 import UpdateIcon from "@mui/icons-material/Update";
-import { preserveWidgetTemplatesAndClear } from "../../localStorageUtils"; // Import utility
+import { preserveWidgetTemplatesAndClear } from "../../localStorageUtils";
 
+// ------------------ Base API endpoint from environment variables ------------------
 const BASE_URL = `${process.env.REACT_APP_API_LOCAL_URL}api`;
 
 const DeleteAlert = styled(Alert)(({ theme }) => ({
@@ -78,6 +79,7 @@ const CDDView = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [graphData, setGraphData] = useState({});
 
+  // ----------------------- Initial Data Fetch Effect ---------------------
   useEffect(() => {
     axios
       .get(`${BASE_URL}/plants`)
@@ -90,6 +92,7 @@ const CDDView = () => {
       .catch((error) => console.error("Error fetching saved views:", error));
   }, []);
 
+  // ----------------------- Terminals Fetch Effect ---------------------
   useEffect(() => {
     if (plant) {
       axios
@@ -105,12 +108,14 @@ const CDDView = () => {
         .catch((error) => console.error("Error fetching terminals:", error));
     } else {
       setTerminals([]);
-      setAvailableMeasurands([]);
       setTerminal("");
+      setAvailableMeasurands([]);
       setMeasurands([]);
     }
+    setMeasurands([]);
   }, [plant]);
 
+  // ----------------------- Measurands Fetch Effect ---------------------
   useEffect(() => {
     if (plant && terminal) {
       axios
@@ -121,8 +126,10 @@ const CDDView = () => {
       setAvailableMeasurands([]);
       setMeasurands([]);
     }
+    setMeasurands([]);
   }, [plant, terminal]);
 
+  // ----------------------- Fetch Graph History ---------------------
   const fetchGraphHistory = useCallback(
     async (measurandName) => {
       const terminalData = terminals.find((t) => t.TerminalName === terminal);
@@ -148,7 +155,7 @@ const CDDView = () => {
     [terminal, terminals, availableMeasurands]
   );
 
-  // CDDView.jsx
+  // ----------------------- Fetch Measurand Value ---------------------
   const fetchMeasurandValue = useCallback(
     async (measurandName, signal) => {
       try {
@@ -177,6 +184,7 @@ const CDDView = () => {
     [plant, terminal, plants, terminals, availableMeasurands]
   );
 
+  // ----------------------- Component Lifecycle Effect ---------------------
   useEffect(() => {
     console.log("CDDView mounted");
     return () => {
@@ -187,6 +195,7 @@ const CDDView = () => {
     };
   }, []);
 
+  // ----------------------- Graph Data Fetch Effect ---------------------
   useEffect(() => {
     if (!showWidgets || !plant || !terminal || !createdWidgets.length) {
       setGraphData({});
@@ -196,6 +205,7 @@ const CDDView = () => {
     let isMounted = true;
     const controller = new AbortController();
 
+    // ----------------------- Fetch All Graph Data ---------------------
     const fetchAllGraphData = async () => {
       try {
         const graphWidgets = createdWidgets.filter(
@@ -227,6 +237,7 @@ const CDDView = () => {
     };
   }, [showWidgets, plant, terminal, createdWidgets, fetchGraphHistory]);
 
+  // ----------------------- Measurand Values Fetch Effect ---------------------
   useEffect(() => {
     if (
       !showWidgets ||
@@ -241,6 +252,7 @@ const CDDView = () => {
     let isMounted = true;
     const controller = new AbortController();
 
+    // ----------------------- Fetch All Measurand Values ---------------------
     const fetchAllMeasurandValues = async () => {
       try {
         const numberWidgets = createdWidgets.filter(
@@ -304,6 +316,7 @@ const CDDView = () => {
     fetchMeasurandValue,
   ]);
 
+  // ----------------------- Memoized Number Widget Props ---------------------
   const numberWidgetPropsMap = useMemo(() => {
     return layout.reduce((acc, item) => {
       if (!item.i.includes("-graph")) {
@@ -329,10 +342,7 @@ const CDDView = () => {
     }, {});
   }, [layout, createdWidgets, plant, terminal, fetchMeasurandValue]);
 
-  const allSelected =
-    measurands.length === availableMeasurands.length &&
-    availableMeasurands.length > 0;
-
+  // ----------------------- Handle Measurand Change ---------------------
   const handleMeasurandChange = (event) => {
     const value = event.target.value;
     if (value.includes("selectAll")) {
@@ -344,13 +354,16 @@ const CDDView = () => {
     }
   };
 
+  // ----------------------- Show Snackbar ---------------------
   const showSnackbar = (message, severity) => {
-    setSnackbarMessage(message);
-    setSnackbarSeverity(severity);
-    setSnackbarOpen(false);
-    setTimeout(() => setSnackbarOpen(true), 100);
+    if (message !== snackbarMessage || severity !== snackbarSeverity) {
+      setSnackbarMessage(message);
+      setSnackbarSeverity(severity);
+      setSnackbarOpen(true);
+    }
   };
 
+  // ----------------------- Handle Go Click ---------------------
   const handleGoClick = () => {
     if (!plant || !terminal || !measurands.length) {
       showSnackbar(
@@ -415,6 +428,7 @@ const CDDView = () => {
     setShowWidgets(true);
   };
 
+  // ----------------------- On Layout Change ---------------------
   const onLayoutChange = (newLayout) => {
     const adjustedLayout = newLayout.map((item) => ({
       ...item,
@@ -442,10 +456,12 @@ const CDDView = () => {
     );
   };
 
+  // ----------------------- Handle Save View ---------------------
   const handleSaveView = () => {
     setSaveDialogOpen(true);
   };
 
+  // ----------------------- Validate View Name ---------------------
   const validateViewName = (name) => {
     if (!name.trim()) return "View name cannot be empty";
     if (
@@ -457,12 +473,14 @@ const CDDView = () => {
     return "";
   };
 
+  // ----------------------- Handle View Name Change ---------------------
   const handleViewNameChange = (e) => {
     const name = e.target.value;
     setViewName(name);
     setViewNameError(validateViewName(name));
   };
 
+  // ----------------------- Handle Save View Confirm ---------------------
   const handleSaveViewConfirm = async () => {
     const nameError = validateViewName(viewName);
     if (nameError) {
@@ -495,7 +513,7 @@ const CDDView = () => {
 
       const response = await axios.post(`${BASE_URL}/saved-views`, viewData);
       setSavedViews((prev) => [...prev, response.data]);
-      preserveWidgetTemplatesAndClear(); // Clear except widget templates
+      preserveWidgetTemplatesAndClear();
       setSaveDialogOpen(false);
       setViewName("");
       setViewDescription("");
@@ -510,6 +528,7 @@ const CDDView = () => {
     }
   };
 
+  // ----------------------- Handle Update View ---------------------
   const handleUpdateView = async () => {
     if (!selectedView) return;
 
@@ -540,7 +559,7 @@ const CDDView = () => {
       setSavedViews((prev) =>
         prev.map((v) => (v._id === selectedView ? response.data : v))
       );
-      preserveWidgetTemplatesAndClear(); // Clear except widget templates
+      preserveWidgetTemplatesAndClear();
       showSnackbar("View updated successfully", "success");
     } catch (error) {
       console.error("Error updating view:", error.response?.data || error);
@@ -551,6 +570,7 @@ const CDDView = () => {
     }
   };
 
+  // ----------------------- Handle View Change ---------------------
   const handleViewChange = async (event) => {
     const viewId = event.target.value;
     setSelectedView(viewId);
@@ -604,11 +624,13 @@ const CDDView = () => {
     }
   };
 
+  // ----------------------- Handle Delete Click ---------------------
   const handleDeleteClick = () => {
     if (!selectedView) return;
     setDeleteDialogOpen(true);
   };
 
+  // ----------------------- Handle Delete View ---------------------
   const handleDeleteView = async () => {
     try {
       await axios.delete(`${BASE_URL}/saved-views/${selectedView}`);
@@ -617,7 +639,7 @@ const CDDView = () => {
       setShowWidgets(false);
       setCreatedWidgets([]);
       setSelectionInfo(null);
-      preserveWidgetTemplatesAndClear(); // Clear except widget templates
+      preserveWidgetTemplatesAndClear();
       showSnackbar("View deleted successfully", "error");
     } catch (error) {
       console.error("Error deleting view:", error);
@@ -627,10 +649,12 @@ const CDDView = () => {
     }
   };
 
+  // ----------------------- Handle Delete Dialog Close ---------------------
   const handleDeleteDialogClose = () => {
     setDeleteDialogOpen(false);
   };
 
+  // ----------------------- Handle Add Widget ---------------------
   const handleAddWidget = () => {
     if (!plant || !terminal) {
       showSnackbar("Please select a plant and terminal first", "warning");
@@ -639,6 +663,7 @@ const CDDView = () => {
     setWidgetDialogOpen(true);
   };
 
+  // ----------------------- Handle Create Widget ---------------------
   const handleCreateWidget = async (widgetData) => {
     if (widgetData.error) {
       showSnackbar(widgetData.error, "warning");
@@ -698,16 +723,19 @@ const CDDView = () => {
     setWidgetDialogOpen(false);
   };
 
+  // ----------------------- Handle Open Properties ---------------------
   const handleOpenProperties = (widgetId) => {
     setSelectedWidgetId(widgetId);
     setPropertiesDialogOpen(true);
   };
 
+  // ----------------------- Handle Close Properties ---------------------
   const handleCloseProperties = () => {
     setPropertiesDialogOpen(false);
     setSelectedWidgetId(null);
   };
 
+  // ----------------------- Handle Apply Settings ---------------------
   const handleApplySettings = (settings, applyToAll) => {
     setCreatedWidgets((prev) => {
       const updatedWidgets = applyToAll
@@ -743,7 +771,12 @@ const CDDView = () => {
     setSelectedWidgetId(null);
   };
 
+  // ----------------------- Transition Slide ---------------------
   const TransitionSlide = (props) => <Slide {...props} direction="left" />;
+
+  const allSelected =
+    measurands.length === availableMeasurands.length &&
+    availableMeasurands.length > 0;
 
   return (
     <Box sx={{ width: "100%" }}>
@@ -1093,7 +1126,7 @@ const CDDView = () => {
       <Snackbar
         key={snackbarMessage}
         open={snackbarOpen}
-        autoHideDuration={6000}
+        autoHideDuration={3000}
         onClose={() => setSnackbarOpen(false)}
         anchorOrigin={{ vertical: "top", horizontal: "right" }}
         sx={{ mt: 8 }}

@@ -3,13 +3,16 @@ import { Paper, Typography, Box } from "@mui/material";
 import { styled } from "@mui/material/styles";
 
 const StyledPaper = styled(Paper)(({ theme, settings }) => ({
-  padding: theme.spacing(2),
-  boxShadow: theme.shadows[2],
   background: settings?.backgroundColor || theme.palette.background.paper,
   border: `${settings?.borderWidth || "1px"} solid ${
     settings?.borderColor || "#e0e0e0"
   }`,
   borderRadius: settings?.borderRadius || "8px",
+  boxSizing: "border-box",
+  width: "100%",
+  height: "100%",
+  display: "flex",
+  flexDirection: "column",
   overflow: "hidden",
 }));
 
@@ -22,9 +25,9 @@ const DashboardImageWidget = ({ data, width, height }) => {
         sx={{
           flexGrow: 1,
           display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          height: "80%",
+          width: "100%",
+          height: "100%",
+          position: "relative",
         }}
       >
         {data.imageData ? (
@@ -35,6 +38,14 @@ const DashboardImageWidget = ({ data, width, height }) => {
               maxWidth: "100%",
               maxHeight: "100%",
               objectFit: "contain",
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              margin: "auto",
+              width: "auto",
+              height: "auto",
             }}
             onError={(e) => {
               e.target.style.display = "none";

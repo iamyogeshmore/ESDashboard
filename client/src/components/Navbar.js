@@ -37,7 +37,6 @@ import {
 const NAV_ITEMS = {
   dashboard: { path: "/", label: "Dashboard" },
   view: { path: "/terminal-view", label: "View" },
-  log: { path: "/log-view", label: "Log View" },
 };
 
 const Navbar = ({ toggleSidebar }) => {
@@ -58,7 +57,8 @@ const Navbar = ({ toggleSidebar }) => {
     if (
       pathname === NAV_ITEMS.view.path ||
       pathname === "/measurand-view" ||
-      pathname === "/script-view"
+      pathname === "/script-view" ||
+      pathname === "/log-view"
     )
       return "view";
     if (pathname.startsWith("/hdd/table/")) return "dashboard";
@@ -69,6 +69,22 @@ const Navbar = ({ toggleSidebar }) => {
 
   useEffect(() => {
     setActiveItem(getActiveItem());
+    switch (location.pathname) {
+      case "/terminal-view":
+        setCurrentView("Terminal View");
+        break;
+      case "/measurand-view":
+        setCurrentView("Measurand View");
+        break;
+      case "/script-view":
+        setCurrentView("Script View");
+        break;
+      case "/log-view":
+        setCurrentView("Log View");
+        break;
+      default:
+        setCurrentView("View");
+    }
   }, [location.pathname, getActiveItem]);
 
   useEffect(() => {
@@ -81,8 +97,8 @@ const Navbar = ({ toggleSidebar }) => {
   const handleViewSelect = (viewName, path) => {
     setCurrentView(viewName);
     setViewAnchorEl(null);
+    setActiveItem("view");
     if (path) {
-      setActiveItem("view");
       navigate(path);
     }
   };
@@ -100,7 +116,6 @@ const Navbar = ({ toggleSidebar }) => {
     setActiveItem(item);
     if (path) {
       navigate(path);
-      setCurrentView("View"); // Reset view dropdown to default
     }
   };
 

@@ -3,33 +3,47 @@ import { Box, Typography, Paper, Tooltip } from "@mui/material";
 import axios from "axios";
 import { formatTimestamp } from "./formatTimestamp";
 
+// ------------------ Base API endpoint from environment variables ------------------
 const API_BASE_URL = `${process.env.REACT_APP_API_LOCAL_URL}api`;
 
-const DashboardNumberWidget = ({ data, width, height }) => {
-  const [value, setValue] = useState(0); // Default to 0 instead of null
+const DashboardNumberWidget = ({
+  data,
+  width,
+  height,
+  onDelete,
+  onSettingsClick,
+  isPublished,
+}) => {
+  const [value, setValue] = useState(null);
   const [timestamp, setTimestamp] = useState(null);
   const [isHovered, setIsHovered] = useState(false);
   const settings = data.settings || {};
 
+  // ----------------------- Fetch Data Effect ---------------------
   useEffect(() => {
     const fetchData = async () => {
       try {
         const { plantId, terminalId, measurandId } = data;
         if (!plantId || !terminalId || !measurandId) {
-          return; // Keep last value
+          setValue(null);
+          return;
         }
 
         const response = await axios.get(
           `${API_BASE_URL}/measurements/${plantId}/${terminalId}/${measurandId}`
         );
         const latestData = response.data[response.data.length - 1];
-        if (latestData) {
-          setValue(parseFloat(latestData.MeasurandValue) || 0);
-          setTimestamp(latestData.TimeStamp);
-        }
+        setValue(
+          latestData &&
+            latestData.MeasurandValue !== undefined &&
+            latestData.MeasurandValue !== null
+            ? parseFloat(latestData.MeasurandValue)
+            : null
+        );
+        setTimestamp(latestData?.TimeStamp || null);
       } catch (error) {
         console.error("Error fetching measurement data:", error.message);
-        // Keep last value instead of resetting
+        setValue(null);
       }
     };
 
@@ -38,112 +52,111 @@ const DashboardNumberWidget = ({ data, width, height }) => {
     return () => clearInterval(interval);
   }, [data.plantId, data.terminalId, data.measurandId]);
 
-  const tooltipTitle = `Last sync: ${formatTimestamp(timestamp)}`;
+  const tooltipTitle = timestamp
+    ? `Last updated: ${formatTimestamp(timestamp)}`
+    : "No data available";
+
+  const displayValue =
+    value === null || value === undefined
+      ? "N/A"
+      : value.toFixed(data.decimals || 2);
 
   return (
     <Tooltip title={tooltipTitle} arrow>
       <Paper
-        elevation={2}
+        elevation={3}
         sx={{
           height: "100%",
           width: "100%",
-          minHeight: "120px",
-          minWidth: "150px",
-          p: 2,
+          minHeight: "80px",
+          minWidth: "120px",
           textAlign: "center",
-          bgcolor: settings.backgroundColor || "#ffffff",
-          borderRadius: settings.borderRadius || "3px",
+          bgcolor:
+            settings.backgroundColor ||
+            "linear-gradient(135deg, #ffffff 0%, #f5f7fa 100%)",
+          borderRadius: settings.borderRadius || "12px",
           border: `${settings.borderWidth || "1px"} solid ${
             settings.borderColor || "#e0e0e0"
           }`,
-          transition: "transform 0.2s",
+          boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)",
+          transition: "transform 0.2s ease, box-shadow 0.2s ease",
           display: "flex",
           flexDirection: "column",
-          justifyContent: "space-between",
-          position: "relative",
-          overflow: "hidden",
+          padding: "8px",
+          boxSizing: "border-box",
+          "&:hover": {
+            boxShadow: "0 6px 20px rgba(0, 0, 0, 0.1)",
+          },
+          "&:hover .control-buttons": {
+            opacity: !isPublished ? 1 : 0,
+          },
         }}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        <Typography
-          variant="subtitle2"
-          sx={{
-            color: settings.titleColor || "#000000",
-            fontFamily: settings.titleFontFamily || "inherit",
-            fontSize: settings.titleFontSize || "14px",
-            fontWeight: settings.titleFontWeight || "normal",
-            fontStyle: settings.titleFontStyle || "normal",
-            textDecoration: settings.titleTextDecoration || "none",
-            wordBreak: "break-word",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {data.name}
-        </Typography>
-        <Box sx={{ flexShrink: 0 }}>
-          <Box
-            className="widget-header"
-            sx={{
-              cursor: "move",
-              mb: 1,
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-              position: "relative",
-            }}
-          >
-            <Box
-              sx={{
-                position: "absolute",
-                right: -8,
-                top: -8,
-                opacity: isHovered ? 1 : 0,
-                transition: "opacity 0.3s ease",
-                display: "flex",
-                gap: 0.5,
-              }}
-            ></Box>
-          </Box>
-        </Box>
+        {/* Header with Title and Icons */}
         <Box
           sx={{
-            flexGrow: 1,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            width: "100%",
+            mb: 1,
+          }}
+        >
+          <Typography
+            variant="subtitle1"
+            sx={{
+              color: settings.titleColor || "#2c3e50",
+              fontFamily: settings.titleFontFamily || "'Roboto', sans-serif",
+              fontSize: settings.titleFontSize || "clamp(12px, 2vw, 16px)",
+              fontWeight: settings.titleFontWeight || 600,
+              fontStyle: settings.titleFontStyle || "normal",
+              textDecoration: settings.titleTextDecoration || "none",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              flexGrow: 1,
+              textAlign: "center",
+            }}
+          >
+            {data.name}
+          </Typography>
+        </Box>
+
+        <Box
+          sx={{
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            overflow: "hidden",
+            gap: 1,
+            flexWrap: "wrap",
+            flexGrow: 1,
           }}
         >
           <Typography
             sx={{
-              color: settings.valueColor || "#000000",
-              fontFamily: settings.valueFontFamily || "inherit",
-              fontWeight: settings.valueFontWeight || "normal",
+              color: settings.valueColor || "#34495e",
+              fontFamily:
+                settings.valueFontFamily || "'Roboto Mono', monospace",
+              fontWeight: settings.valueFontWeight || 700,
               fontStyle: settings.valueFontStyle || "normal",
+              fontSize: settings.valueFontSize || "16px",
               textDecoration: settings.valueTextDecoration || "none",
-              fontSize: settings.valueFontSize || "24px",
-              wordBreak: "break-word",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-              maxWidth: "100%",
             }}
           >
-            {value.toFixed(data.decimals || 2)}
+            {displayValue}
           </Typography>
-          {data.unit && (
+          {data.unit && value !== null && value !== undefined && (
             <Typography
               sx={{
-                color: settings.titleColor || "#000000",
-                fontFamily: settings.titleFontFamily || "inherit",
-                fontSize: settings.titleFontSize || "14px",
-                fontWeight: settings.titleFontWeight || "normal",
+                color: settings.titleColor || "#2c3e50",
+                fontFamily: settings.titleFontFamily || "'Roboto', sans-serif",
+                fontSize: settings.titleFontSize || "12px",
+                fontWeight: settings.titleFontWeight || 600,
                 fontStyle: settings.titleFontStyle || "normal",
                 textDecoration: settings.titleTextDecoration || "none",
-                ml: 1,
+                letterSpacing: "0.5px",
               }}
             >
               {data.unit}

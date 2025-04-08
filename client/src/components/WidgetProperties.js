@@ -35,27 +35,10 @@ import {
 import { SketchPicker } from "react-color";
 import { styled } from "@mui/material/styles";
 
+// ------------------ Base API endpoint from environment variables ------------------
 const BASE_URL = `${process.env.REACT_APP_API_LOCAL_URL}api`;
 
-const customDefaultWidgetSettings = {
-  backgroundColor: "#000000",
-  borderColor: "#ffffff",
-  borderRadius: "3px",
-  borderWidth: "1px",
-  titleColor: "#ffffff",
-  titleFontFamily: "Arial",
-  titleFontSize: "24px",
-  titleFontStyle: "normal",
-  titleFontWeight: "normal",
-  titleTextDecoration: "none",
-  valueColor: "#f8e71c",
-  valueFontFamily: "Arial",
-  valueFontSize: "24px",
-  valueFontStyle: "normal",
-  valueFontWeight: "bold",
-  valueTextDecoration: "none",
-};
-
+// ------------------ Utility function to adjust size ------------------
 const adjustSize = (currentSize, increment = true, min = 0) => {
   const sizeStr =
     typeof currentSize === "string" ? currentSize : `${currentSize || 0}px`;
@@ -70,6 +53,8 @@ const WidgetProperties = ({
   viewId,
   onClose,
   widgetData,
+  isDashboard,
+  dashboardName,
 }) => {
   const [settings, setSettings] = useState({});
   const [savedTemplates, setSavedTemplates] = useState([]);
@@ -81,43 +66,46 @@ const WidgetProperties = ({
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
   const [currentColorField, setCurrentColorField] = useState(null);
   const [applyToAll, setApplyToAll] = useState(false);
+  const [selectedWidgetType, setSelectedWidgetType] = useState("");
 
+  // Default settings to fall back to if widgetData.settings is incomplete
+  const defaultSettings = {
+    backgroundColor: "#334155",
+    borderColor: "#94A3B8",
+    borderRadius: "3px",
+    borderWidth: "2px",
+    titleColor: "#E2E8F0",
+    titleFontFamily: "Arial",
+    titleFontSize: "22px",
+    titleFontStyle: "normal",
+    titleFontWeight: "normal",
+    titleTextDecoration: "none",
+    valueColor: "#FFFFFF",
+    valueFontFamily: "Arial",
+    valueFontSize: "44px",
+    valueFontStyle: "normal",
+    valueFontWeight: "bold",
+    valueTextDecoration: "none",
+  };
+
+  // --------------------------- Load saved templates and current widget settings ---------------------------
   useEffect(() => {
-    const loadSavedTemplates = () => {
-      const templates = Object.keys(localStorage)
-        .filter((key) => key.startsWith("widgetTemplate_"))
-        .map((key) => key.replace("widgetTemplate_", ""));
-      setSavedTemplates(templates);
+    const loadSavedTemplates = async () => {
+      try {
+        const response = await axios.get(`${BASE_URL}/widget-templates`);
+        setSavedTemplates(response.data);
+      } catch (error) {
+        console.error("Error loading templates:", error);
+      }
     };
-
     loadSavedTemplates();
 
-    if (widgetData && widgetData.settings) {
-      setSettings({ ...customDefaultWidgetSettings, ...widgetData.settings });
-    } else if (selectedWidget) {
-      const widgetSettings = localStorage.getItem(
-        `widgetSettings_${selectedWidget}`
-      );
-      if (widgetSettings) {
-        try {
-          setSettings({
-            ...customDefaultWidgetSettings,
-            ...JSON.parse(widgetSettings),
-          });
-        } catch (error) {
-          console.error(
-            `Error parsing settings for widget ${selectedWidget}:`,
-            error
-          );
-          setSettings({ ...customDefaultWidgetSettings });
-        }
-      } else {
-        setSettings({ ...customDefaultWidgetSettings });
-      }
-    } else {
-      setSettings({ ...customDefaultWidgetSettings });
-    }
-  }, [selectedWidget, widgetData]);
+    const currentSettings = widgetData?.settings || {};
+    setSettings({
+      ...defaultSettings,
+      ...currentSettings,
+    });
+  }, [widgetData]);
 
   const handleInputChange = (field) => (event) => {
     setSettings({ ...settings, [field]: event.target.value });
@@ -151,41 +139,47 @@ const WidgetProperties = ({
     }));
   };
 
+  // --------------------------- Save settings to the server ---------------------------
   const saveSettings = async () => {
     try {
       const updatedSettings = { ...settings };
-      localStorage.setItem("widgetSettings", JSON.stringify(updatedSettings));
-      if (selectedWidget) {
-        localStorage.setItem(
-          `widgetSettings_${selectedWidget}`,
-          JSON.stringify(updatedSettings)
-        );
+
+      if (selectedWidget && !applyToAll) {
+        if (isDashboard && dashboardName) {
+          await axios.patch(
+            `${BASE_URL}/dashboards/widgets/${selectedWidget}/properties`,
+            updatedSettings
+          );
+        } else if (viewId) {
+          await axios.patch(
+            `${BASE_URL}/saved-views/${viewId}/widgets/${selectedWidget}`,
+            updatedSettings
+          );
+        }
       }
 
-      if (viewId && selectedWidget) {
-        const response = await axios.patch(
-          `${BASE_URL}/saved-views/${viewId}/widgets/${selectedWidget}`,
-          updatedSettings
-        );
-        console.log("Updated view:", response.data);
-      }
-
-      if (onApply) onApply(updatedSettings, applyToAll, selectedWidget);
+      if (onApply) onApply(updatedSettings, applyToAll, selectedWidgetType);
       if (onClose) onClose();
     } catch (error) {
       console.error("Error saving widget settings:", error);
+      throw error;
     }
   };
 
-  const loadTemplate = (templateName) => {
-    const template = localStorage.getItem(`widgetTemplate_${templateName}`);
-    if (template) {
-      try {
-        setSettings(JSON.parse(template));
-        setSelectedTemplate(templateName);
-      } catch (error) {
-        console.error(`Error loading template ${templateName}:`, error);
-      }
+  // --------------------------- Load selected template settings ---------------------------
+  const loadTemplate = async (templateId) => {
+    try {
+      const response = await axios.get(
+        `${BASE_URL}/widget-templates/${templateId}`
+      );
+      const templateSettings = response.data.settings || {};
+      setSettings({
+        ...settings,
+        ...templateSettings,
+      });
+      setSelectedTemplate(templateId);
+    } catch (error) {
+      console.error(`Error loading template ${templateId}:`, error);
     }
   };
 
@@ -195,58 +189,95 @@ const WidgetProperties = ({
     setTemplateNameError("");
   };
 
+  const handleOpenEditDialog = () => {
+    const currentTemplate = savedTemplates.find(
+      (t) => t._id === selectedTemplate
+    );
+    setNewTemplateName(currentTemplate?.name || "");
+    setEditDialogOpen(true);
+    setTemplateNameError("");
+  };
+
   const validateTemplateName = (name) => {
     if (!name.trim()) return "Template name cannot be empty";
-    if (savedTemplates.includes(name) && !editDialogOpen)
+    if (
+      savedTemplates.some(
+        (t) =>
+          t.name.toLowerCase() === name.toLowerCase() &&
+          t._id !== selectedTemplate
+      )
+    )
       return "Template name already exists";
     return "";
   };
 
-  const saveTemplate = () => {
+  // --------------------------- Save and update template ---------------------------
+  const saveTemplate = async () => {
     const error = validateTemplateName(newTemplateName);
     if (error) {
       setTemplateNameError(error);
       return;
     }
-    localStorage.setItem(
-      `widgetTemplate_${newTemplateName}`,
-      JSON.stringify(settings)
-    );
-    setSavedTemplates([...savedTemplates, newTemplateName]);
-    setSaveDialogOpen(false);
-    setSelectedTemplate(newTemplateName);
+    try {
+      const response = await axios.post(`${BASE_URL}/widget-templates`, {
+        name: newTemplateName,
+        settings,
+      });
+      setSavedTemplates([...savedTemplates, response.data]);
+      setSaveDialogOpen(false);
+      setSelectedTemplate(response.data._id);
+    } catch (error) {
+      console.error("Error saving template:", error);
+      setTemplateNameError("Failed to save template");
+    }
   };
 
-  const updateTemplate = () => {
+  const updateTemplate = async () => {
     const error = validateTemplateName(newTemplateName);
-    if (error && newTemplateName !== selectedTemplate) {
+    if (
+      error &&
+      newTemplateName !==
+        savedTemplates.find((t) => t._id === selectedTemplate)?.name
+    ) {
       setTemplateNameError(error);
       return;
     }
-    localStorage.setItem(
-      `widgetTemplate_${newTemplateName}`,
-      JSON.stringify(settings)
-    );
-    if (newTemplateName !== selectedTemplate) {
-      localStorage.removeItem(`widgetTemplate_${selectedTemplate}`);
+    try {
+      const response = await axios.put(
+        `${BASE_URL}/widget-templates/${selectedTemplate}`,
+        {
+          name: newTemplateName,
+          settings,
+        }
+      );
       setSavedTemplates(
         savedTemplates.map((t) =>
-          t === selectedTemplate ? newTemplateName : t
+          t._id === selectedTemplate ? response.data : t
         )
       );
+      setEditDialogOpen(false);
+    } catch (error) {
+      console.error("Error updating template:", error);
+      setTemplateNameError("Failed to update template");
     }
-    setEditDialogOpen(false);
-    setSelectedTemplate(newTemplateName);
   };
 
-  const deleteTemplate = () => {
+  // ---------------------- Delete template ----------------------
+  const deleteTemplate = async () => {
     if (!selectedTemplate) {
       setTemplateNameError("Please select a template to delete.");
       return;
     }
-    localStorage.removeItem(`widgetTemplate_${selectedTemplate}`);
-    setSavedTemplates(savedTemplates.filter((t) => t !== selectedTemplate));
-    setSelectedTemplate("");
+    try {
+      await axios.delete(`${BASE_URL}/widget-templates/${selectedTemplate}`);
+      setSavedTemplates(
+        savedTemplates.filter((t) => t._id !== selectedTemplate)
+      );
+      setSelectedTemplate("");
+    } catch (error) {
+      console.error("Error deleting template:", error);
+      setTemplateNameError("Failed to delete template");
+    }
   };
 
   const WidgetPreview = () => (
@@ -296,6 +327,8 @@ const WidgetProperties = ({
     </Paper>
   );
 
+  const widgetTypes = ["number", "graph", "gauge", "image", "datagrid", "text"];
+
   return (
     <Box sx={{ p: 3, bgcolor: "#0f1415" }}>
       <CoolPaper elevation={3}>
@@ -322,7 +355,7 @@ const WidgetProperties = ({
               </Typography>
               <CoolTextField
                 label="Background Color"
-                value={settings.backgroundColor}
+                value={settings.backgroundColor || ""}
                 onChange={handleInputChange("backgroundColor")}
                 fullWidth
                 InputProps={{
@@ -346,7 +379,7 @@ const WidgetProperties = ({
               />
               <CoolTextField
                 label="Border Color"
-                value={settings.borderColor}
+                value={settings.borderColor || ""}
                 onChange={handleInputChange("borderColor")}
                 fullWidth
                 sx={{ mt: 2 }}
@@ -371,14 +404,14 @@ const WidgetProperties = ({
               />
               <CoolTextField
                 label="Border Radius"
-                value={settings.borderRadius}
+                value={settings.borderRadius || ""}
                 onChange={handleInputChange("borderRadius")}
                 fullWidth
                 sx={{ mt: 2 }}
               />
               <CoolTextField
                 label="Border Width"
-                value={settings.borderWidth}
+                value={settings.borderWidth || ""}
                 onChange={handleInputChange("borderWidth")}
                 fullWidth
                 sx={{ mt: 2 }}
@@ -393,7 +426,7 @@ const WidgetProperties = ({
               </Typography>
               <CoolTextField
                 label="Title Color"
-                value={settings.titleColor}
+                value={settings.titleColor || ""}
                 onChange={handleInputChange("titleColor")}
                 fullWidth
                 InputProps={{
@@ -420,7 +453,7 @@ const WidgetProperties = ({
                   Font Family
                 </InputLabel>
                 <CoolSelect
-                  value={settings.titleFontFamily}
+                  value={settings.titleFontFamily || ""}
                   onChange={handleInputChange("titleFontFamily")}
                   label="Font Family"
                 >
@@ -433,7 +466,7 @@ const WidgetProperties = ({
               <Box sx={{ display: "flex", alignItems: "center", mt: 2 }}>
                 <CoolTextField
                   label="Font Size"
-                  value={settings.titleFontSize}
+                  value={settings.titleFontSize || ""}
                   onChange={handleInputChange("titleFontSize")}
                   fullWidth
                 />
@@ -506,7 +539,7 @@ const WidgetProperties = ({
               </Typography>
               <CoolTextField
                 label="Value Color"
-                value={settings.valueColor}
+                value={settings.valueColor || ""}
                 onChange={handleInputChange("valueColor")}
                 fullWidth
                 InputProps={{
@@ -533,7 +566,7 @@ const WidgetProperties = ({
                   Font Family
                 </InputLabel>
                 <CoolSelect
-                  value={settings.valueFontFamily}
+                  value={settings.valueFontFamily || ""}
                   onChange={handleInputChange("valueFontFamily")}
                   label="Font Family"
                 >
@@ -546,7 +579,7 @@ const WidgetProperties = ({
               <Box sx={{ display: "flex", alignItems: "center", mt: 2 }}>
                 <CoolTextField
                   label="Font Size"
-                  value={settings.valueFontSize}
+                  value={settings.valueFontSize || ""}
                   onChange={handleInputChange("valueFontSize")}
                   fullWidth
                 />
@@ -639,8 +672,8 @@ const WidgetProperties = ({
                   <em>None</em>
                 </MenuItem>
                 {savedTemplates.map((template) => (
-                  <MenuItem key={template} value={template}>
-                    {template}
+                  <MenuItem key={template._id} value={template._id}>
+                    {template.name}
                   </MenuItem>
                 ))}
               </CoolSelect>
@@ -658,10 +691,28 @@ const WidgetProperties = ({
                     "&:hover": { borderColor: "#357abd", color: "#357abd" },
                   }}
                 >
-                  Save
+                  Save New
                 </CoolButton>
               </Tooltip>
-
+              <Tooltip title="Update selected template">
+                <CoolButton
+                  variant="outlined"
+                  startIcon={<SaveIcon />}
+                  onClick={handleOpenEditDialog}
+                  disabled={!selectedTemplate}
+                  sx={{
+                    flex: 1,
+                    borderColor: "#4a90e2",
+                    color: selectedTemplate ? "#4a90e2" : "#999",
+                    "&:hover": {
+                      borderColor: selectedTemplate ? "#357abd" : "#999",
+                      color: selectedTemplate ? "#357abd" : "#999",
+                    },
+                  }}
+                >
+                  Update
+                </CoolButton>
+              </Tooltip>
               <Tooltip title="Delete the selected template">
                 <CoolButton
                   variant="outlined"
@@ -702,6 +753,27 @@ const WidgetProperties = ({
             label="Apply to all widgets in this view"
             sx={{ color: "#e0e0e0" }}
           />
+          {applyToAll && (
+            <FormControl fullWidth sx={{ mt: 2 }}>
+              <InputLabel sx={{ color: "rgba(255, 255, 255, 0.6)" }}>
+                Apply to Widget Type
+              </InputLabel>
+              <CoolSelect
+                value={selectedWidgetType}
+                onChange={(e) => setSelectedWidgetType(e.target.value)}
+                label="Apply to Widget Type"
+              >
+                <MenuItem value="">
+                  <em>All Types</em>
+                </MenuItem>
+                {widgetTypes.map((type) => (
+                  <MenuItem key={type} value={type}>
+                    {type.charAt(0).toUpperCase() + type.slice(1)}
+                  </MenuItem>
+                ))}
+              </CoolSelect>
+            </FormControl>
+          )}
         </Box>
 
         <Box
@@ -743,10 +815,13 @@ const WidgetProperties = ({
           }}
         >
           <SketchPicker
-            color={settings[currentColorField]}
+            color={settings[currentColorField] || "#000000"}
             onChangeComplete={handleColorChange(currentColorField)}
           />
-          <Button onClick={closeColorPicker} sx={{ mt: 1, width: "100%" }}>
+          <Button
+            onClick={closeColorPicker}
+            sx={{ mt: 1, width: "100%", bgcolor: "#4a90e2", color: "#fff" }}
+          >
             Close
           </Button>
         </Box>
@@ -782,6 +857,9 @@ const WidgetProperties = ({
       </Dialog>
 
       <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)}>
+        <DialogTitle sx={{ bgcolor: "#4a90e2", color: "#fff" }}>
+          Update Template
+        </DialogTitle>
         <DialogContent sx={{ bgcolor: "#1a2526" }}>
           <CoolTextField
             autoFocus

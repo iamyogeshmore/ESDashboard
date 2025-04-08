@@ -10,22 +10,24 @@ import SnackbarComponent from "../components/Dashboard/SnackbarComponent";
 import PropertiesDialog from "../components/Dashboard/PropertiesDialog";
 import { preserveWidgetTemplatesAndClear } from "../components/localStorageUtils";
 
+// ----------------- Base API endpoint from environment variables -----------------
 const API_BASE_URL = `${process.env.REACT_APP_API_LOCAL_URL}api`;
 
+// ----------------- Default widget settings -----------------
 const customDefaultWidgetSettings = {
-  backgroundColor: "#000000",
-  borderColor: "#ffffff",
+  backgroundColor: "#334155",
+  borderColor: "#94A3B8",
   borderRadius: "3px",
-  borderWidth: "1px",
-  titleColor: "#ffffff",
+  borderWidth: "2px",
+  titleColor: "#E2E8F0",
   titleFontFamily: "Arial",
-  titleFontSize: "24px",
+  titleFontSize: "22px",
   titleFontStyle: "normal",
   titleFontWeight: "normal",
   titleTextDecoration: "none",
-  valueColor: "#f8e71c",
-  valueFontFamily: "Arial",
-  valueFontSize: "24px",
+  valueColor: "#FFFFFF",
+  valueFontFamily: "Arials",
+  valueFontSize: "44px",
   valueFontStyle: "normal",
   valueFontWeight: "bold",
   valueTextDecoration: "none",
@@ -60,7 +62,10 @@ const Dashboard = ({
   const [selectedWidgetId, setSelectedWidgetId] = useState(null);
   const [selectedWidgetData, setSelectedWidgetData] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [loadingSave, setLoadingSave] = useState(false);
+  const [loadingPublish, setLoadingPublish] = useState(false);
 
+  // ----------------- Load initial dashboard and plants -----------------
   useEffect(() => {
     const loadInitialDashboard = async () => {
       try {
@@ -95,6 +100,7 @@ const Dashboard = ({
       }
     };
 
+    // -------------- Fetch plants --------------
     const fetchPlants = async () => {
       try {
         const response = await axios.get(`${API_BASE_URL}/plants`);
@@ -108,6 +114,7 @@ const Dashboard = ({
     fetchPlants();
   }, [setWidgets, setDashboardName, setActiveDashboard]);
 
+  // ----------------- -----------------
   useEffect(() => {
     const updateDashboardFromProps = async () => {
       if (dashboardName) {
@@ -175,12 +182,26 @@ const Dashboard = ({
     setOpenPropertiesDialog(true);
   };
 
-  const handleApplySettings = async (settings, applyToAll) => {
-    const updatedWidgets = widgets.map((widget) =>
-      applyToAll || widget.id === selectedWidgetId
-        ? { ...widget, settings }
-        : widget
-    );
+  const handleApplySettings = async (
+    settings,
+    applyToAll,
+    selectedWidgetType
+  ) => {
+    let updatedWidgets;
+    if (applyToAll) {
+      if (selectedWidgetType) {
+        updatedWidgets = widgets.map((widget) =>
+          widget.type === selectedWidgetType ? { ...widget, settings } : widget
+        );
+      } else {
+        updatedWidgets = widgets.map((widget) => ({ ...widget, settings }));
+      }
+    } else {
+      updatedWidgets = widgets.map((widget) =>
+        widget.id === selectedWidgetId ? { ...widget, settings } : widget
+      );
+    }
+
     setWidgets(updatedWidgets);
     localStorage.setItem("dashboardWidgets", JSON.stringify(updatedWidgets));
     if (dashboardName) {
@@ -298,6 +319,7 @@ const Dashboard = ({
       triggerSnackbar("Please enter a dashboard name", "warning");
       return;
     }
+    setLoadingSave(true);
     const dashboardData = {
       id: Date.now(),
       name: dashboardName,
@@ -320,11 +342,14 @@ const Dashboard = ({
     } catch (error) {
       console.error("Error saving dashboard to database:", error);
       triggerSnackbar("Failed to save dashboard", "error");
+    } finally {
+      setLoadingSave(false);
     }
   };
 
   const handleUpdateDashboard = async () => {
     if (!dashboardName) return;
+    setLoadingSave(true);
     try {
       const dashboardData = { widgets };
       const response = await axios.put(
@@ -339,6 +364,8 @@ const Dashboard = ({
     } catch (error) {
       console.error("Error updating dashboard:", error);
       triggerSnackbar("Failed to update dashboard", "error");
+    } finally {
+      setLoadingSave(false);
     }
   };
 
@@ -347,6 +374,7 @@ const Dashboard = ({
       triggerSnackbar("Please save the dashboard with a name first", "warning");
       return;
     }
+    setLoadingPublish(true);
     try {
       const response = await axios.put(
         `${API_BASE_URL}/dashboards/${dashboardName}/publish`
@@ -359,6 +387,8 @@ const Dashboard = ({
     } catch (error) {
       console.error("Error publishing dashboard:", error);
       triggerSnackbar("Failed to publish dashboard", "error");
+    } finally {
+      setLoadingPublish(false);
     }
   };
 
@@ -408,6 +438,8 @@ const Dashboard = ({
           handleIconClick={handleIconClick}
           handleSave={handleSave}
           handlePublish={handlePublish}
+          loadingSave={loadingSave}
+          loadingPublish={loadingPublish}
         />
       )}
       {isPublished && (
@@ -482,6 +514,7 @@ const Dashboard = ({
             widgetData={selectedWidgetData}
             handleApplySettings={handleApplySettings}
             viewId={dashboardName}
+            dashboardName={dashboardName}
           />
         </>
       )}

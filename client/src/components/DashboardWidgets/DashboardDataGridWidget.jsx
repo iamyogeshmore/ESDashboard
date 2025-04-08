@@ -17,6 +17,7 @@ import { styled } from "@mui/material/styles";
 import { ThemeContext } from "../../contexts/ThemeContext";
 import { formatTimestamp } from "./formatTimestamp";
 
+// ------------------ Base API endpoint from environment variables ------------------
 const API_BASE_URL = `${process.env.REACT_APP_API_LOCAL_URL}api`;
 
 const StyledPaper = styled(Paper)(({ theme, settings }) => ({
@@ -89,18 +90,11 @@ const DashboardDataGridWidget = ({
       Array(rows)
         .fill()
         .map(() =>
-          Array(measurandColumns).fill({ value: "", timestamp: "", unit: "" })
+          Array(measurandColumns).fill({ value: null, timestamp: "", unit: "" })
         )
   );
 
-  useEffect(() => {
-    console.log("DashboardDataGridWidget Props:", {
-      dashboardName,
-      widgetId: data.id,
-      data,
-    });
-  }, [dashboardName, data]);
-
+  // ----------------------- Save Selections to Database ---------------------
   const saveSelectionsToDB = useCallback(async () => {
     if (!dashboardName || !data.id) {
       console.error(
@@ -128,6 +122,7 @@ const DashboardDataGridWidget = ({
     selectedMeasurements,
   ]);
 
+  // ----------------------- Fetch Plants ---------------------
   const fetchPlants = useCallback(async () => {
     try {
       const response = await axios.get(`${API_BASE_URL}/plants`);
@@ -142,6 +137,7 @@ const DashboardDataGridWidget = ({
     }
   }, [selectedPlant]);
 
+  // ----------------------- Fetch Terminals ---------------------
   const fetchTerminals = useCallback(
     async (plantName) => {
       if (!plantName) return;
@@ -162,6 +158,7 @@ const DashboardDataGridWidget = ({
     [rows, selectedTerminals]
   );
 
+  // ----------------------- Fetch Measurands ---------------------
   const fetchMeasurands = useCallback(
     async (plantName, terminalName) => {
       if (!plantName || !terminalName) return;
@@ -184,9 +181,10 @@ const DashboardDataGridWidget = ({
     [measurandColumns, selectedMeasurements]
   );
 
+  // ----------------------- Fetch Measurement Data ---------------------
   const fetchMeasurementData = async (plantId, terminalId, measurandId) => {
     if (!plantId || !terminalId || !measurandId) {
-      return { value: "", timestamp: "", unit: "" };
+      return { value: null, timestamp: "", unit: "" };
     }
     try {
       const response = await axios.get(
@@ -198,117 +196,24 @@ const DashboardDataGridWidget = ({
         return {
           value:
             latest.MeasurandValue !== undefined &&
-            latest.MeasurandValue !== null &&
-            !isNaN(parseFloat(latest.MeasurandValue))
+            latest.MeasurandValue !== null
               ? parseFloat(latest.MeasurandValue)
-              : "",
+              : null,
           timestamp: latest.TimeStamp || "",
           unit: latest.Unit || "",
         };
       }
-      return { value: "", timestamp: "", unit: "" };
+      return { value: null, timestamp: "", unit: "" };
     } catch (error) {
       console.error(
         `Error fetching data for ${plantId}/${terminalId}/${measurandId}:`,
         error.message
       );
-      return { value: "", timestamp: "", unit: "" };
+      return { value: null, timestamp: "", unit: "" };
     }
   };
 
-  useEffect(() => {
-    let isMounted = true;
-    const fetchData = async () => {
-      if (
-        !selectedPlant ||
-        selectedTerminals.some((t) => !t) ||
-        selectedMeasurements.some((m) => !m)
-      ) {
-        setGridData(
-          Array(rows)
-            .fill()
-            .map(() =>
-              Array(measurandColumns).fill({
-                value: "",
-                timestamp: "",
-                unit: "",
-              })
-            )
-        );
-        return;
-      }
-
-      const plantId = plants.find(
-        (p) => p.PlantName === selectedPlant
-      )?.PlantId;
-      const newData = await Promise.all(
-        selectedTerminals.map(async (terminal) => {
-          const terminalId = terminals.find(
-            (t) => t.TerminalName === terminal
-          )?.TerminalId;
-          const rowData = await Promise.all(
-            selectedMeasurements.map(async (measurand) => {
-              const measurandId = measurands.find(
-                (m) => m.MeasurandName === measurand
-              )?.MeasurandId;
-              return await fetchMeasurementData(
-                plantId,
-                terminalId,
-                measurandId
-              );
-            })
-          );
-          return rowData;
-        })
-      );
-
-      if (isMounted) {
-        setGridData(
-          newData.length
-            ? newData
-            : Array(rows).fill(
-                Array(measurandColumns).fill({
-                  value: "",
-                  timestamp: "",
-                  unit: "",
-                })
-              )
-        );
-        saveSelectionsToDB();
-      }
-    };
-
-    fetchData();
-    const interval = setInterval(fetchData, 5000);
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
-  }, [
-    selectedPlant,
-    selectedTerminals,
-    selectedMeasurements,
-    rows,
-    measurandColumns,
-    saveSelectionsToDB,
-    plants,
-    terminals,
-    measurands,
-  ]);
-
-  useEffect(() => {
-    if (!plants.length) fetchPlants();
-  }, [plants.length, fetchPlants]);
-
-  useEffect(() => {
-    if (selectedPlant) fetchTerminals(selectedPlant);
-  }, [selectedPlant, fetchTerminals]);
-
-  useEffect(() => {
-    if (selectedPlant && selectedTerminals[0])
-      fetchMeasurands(selectedPlant, selectedTerminals[0]);
-  }, [selectedPlant, selectedTerminals, fetchMeasurands]);
-
+  // ----------------------- Handle Plant Change ---------------------
   const handlePlantChange = (_, value) => {
     setSelectedPlant(value);
     setSelectedTerminals(Array(rows).fill(""));
@@ -317,12 +222,13 @@ const DashboardDataGridWidget = ({
       Array(rows)
         .fill()
         .map(() =>
-          Array(measurandColumns).fill({ value: "", timestamp: "", unit: "" })
+          Array(measurandColumns).fill({ value: null, timestamp: "", unit: "" })
         )
     );
     saveSelectionsToDB();
   };
 
+  // ----------------------- Handle Terminal Change ---------------------
   const handleTerminalChange = (rowIdx, value) => {
     const newTerminals = [...selectedTerminals];
     newTerminals[rowIdx] = value;
@@ -330,6 +236,7 @@ const DashboardDataGridWidget = ({
     saveSelectionsToDB();
   };
 
+  // ----------------------- Handle Measurement Change ---------------------
   const handleMeasurementChange = (colIdx, value) => {
     const newMeasurements = [...selectedMeasurements];
     newMeasurements[colIdx] = value;
@@ -337,6 +244,7 @@ const DashboardDataGridWidget = ({
     saveSelectionsToDB();
   };
 
+  // ----------------------- Render Dropdown ---------------------
   const renderDropdown = (type, value, options, onChange, index) => {
     if (isPublished) {
       return null;
@@ -407,6 +315,7 @@ const DashboardDataGridWidget = ({
     );
   };
 
+  // ----------------------- Get Typography Styles ---------------------
   const getTypographyStyles = (type) => ({
     color:
       type === "title"
@@ -426,7 +335,7 @@ const DashboardDataGridWidget = ({
         : settings.valueFontStyle || "normal",
     fontWeight:
       type === "title"
-        ? settings.titleFontWeight || "normal"
+        ? settings.titleFontWeight || "normal  normal"
         : settings.valueFontWeight || "normal",
     textDecoration:
       type === "title"
@@ -435,6 +344,107 @@ const DashboardDataGridWidget = ({
     wordWrap: "break-word",
     maxWidth: "200px",
   });
+
+  useEffect(() => {
+    console.log("DashboardDataGridWidget Props:", {
+      dashboardName,
+      widgetId: data.id,
+      data,
+    });
+  }, [dashboardName, data]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchData = async () => {
+      if (
+        !selectedPlant ||
+        selectedTerminals.some((t) => !t) ||
+        selectedMeasurements.some((m) => !m)
+      ) {
+        setGridData(
+          Array(rows)
+            .fill()
+            .map(() =>
+              Array(measurandColumns).fill({
+                value: null,
+                timestamp: "",
+                unit: "",
+              })
+            )
+        );
+        return;
+      }
+
+      const plantId = plants.find(
+        (p) => p.PlantName === selectedPlant
+      )?.PlantId;
+      const newData = await Promise.all(
+        selectedTerminals.map(async (terminal) => {
+          const terminalId = terminals.find(
+            (t) => t.TerminalName === terminal
+          )?.TerminalId;
+          const rowData = await Promise.all(
+            selectedMeasurements.map(async (measurand) => {
+              const measurandId = measurands.find(
+                (m) => m.MeasurandName === measurand
+              )?.MeasurandId;
+              return await fetchMeasurementData(
+                plantId,
+                terminalId,
+                measurandId
+              );
+            })
+          );
+          return rowData;
+        })
+      );
+
+      if (isMounted) {
+        setGridData(
+          newData.length
+            ? newData
+            : Array(rows).fill(
+                Array(measurandColumns).fill({
+                  value: null,
+                  timestamp: "",
+                  unit: "",
+                })
+              )
+        );
+        saveSelectionsToDB();
+      }
+    };
+
+    fetchData();
+    const interval = setInterval(fetchData, 5000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [
+    selectedPlant,
+    selectedTerminals,
+    selectedMeasurements,
+    rows,
+    measurandColumns,
+    saveSelectionsToDB,
+    plants,
+    terminals,
+    measurands,
+  ]);
+
+  useEffect(() => {
+    if (!plants.length) fetchPlants();
+  }, [plants.length, fetchPlants]);
+
+  useEffect(() => {
+    if (selectedPlant) fetchTerminals(selectedPlant);
+  }, [selectedPlant, fetchTerminals]);
+
+  useEffect(() => {
+    if (selectedPlant && selectedTerminals[0])
+      fetchMeasurands(selectedPlant, selectedTerminals[0]);
+  }, [selectedPlant, selectedTerminals, fetchMeasurands]);
 
   return (
     <StyledPaper
@@ -515,7 +525,9 @@ const DashboardDataGridWidget = ({
                 {gridData[rowIdx]?.map((cell, colIdx) => (
                   <StyledTableCell key={colIdx} settings={settings}>
                     <Typography sx={getTypographyStyles("value")}>
-                      {cell.value !== "" ? `${cell.value.toFixed(2)}` : ""}
+                      {cell.value === null || cell.value === undefined
+                        ? "N/A"
+                        : cell.value.toFixed(2)}
                     </Typography>
                   </StyledTableCell>
                 ))}

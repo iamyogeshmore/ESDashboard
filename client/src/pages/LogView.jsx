@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import axios from "axios";
 import {
   Box,
   Button,
@@ -13,8 +14,6 @@ import {
   TextField,
   Card,
   CardContent,
-  Divider,
-  Chip,
   IconButton,
   useTheme,
   alpha,
@@ -23,7 +22,6 @@ import {
   Alert as MuiAlert,
 } from "@mui/material";
 import { DataGrid, GridToolbar } from "@mui/x-data-grid";
-import axios from "axios";
 import { styled } from "@mui/material/styles";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import DateRangeIcon from "@mui/icons-material/DateRange";
@@ -36,7 +34,11 @@ import TableChartIcon from "@mui/icons-material/TableChart";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
+
+// Base API endpoint from environment variables
 const BASE_URL = `${process.env.REACT_APP_API_LOCAL_URL}api`;
+
+// Styled components (unchanged)
 const StyledPaper = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(4),
   borderRadius: "16px",
@@ -145,32 +147,80 @@ const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
   },
 }));
 
-// Custom styled Alert for Snackbar
-const StyledAlert = styled(MuiAlert)(({ theme }) => ({
+const StyledAlert = styled(MuiAlert)(({ theme, severity }) => ({
+  backdropFilter: "blur(8px)",
+  boxShadow: `0 4px 16px ${alpha(theme.palette.grey[500], 0.2)}`,
+  border: `1px solid ${alpha(theme.palette[severity].main, 0.3)}`,
+  display: "flex",
+  alignItems: "center",
+  transition: "all 0.3s ease-in-out",
+  transform: "translateY(0)",
+  "&:hover": {
+    transform: "translateY(-2px)",
+    boxShadow: `0 6px 20px ${alpha(theme.palette.grey[500], 0.3)}`,
+  },
+  background:
+    theme.palette.mode === "dark"
+      ? `linear-gradient(135deg, ${alpha(
+          theme.palette[severity].dark,
+          0.9
+        )} 0%, ${alpha(theme.palette[severity].main, 0.7)} 100%)`
+      : `linear-gradient(135deg, ${alpha(
+          theme.palette[severity].light,
+          0.9
+        )} 0%, ${alpha(theme.palette[severity].main, 0.8)} 100%)`,
   color:
     theme.palette.mode === "dark"
       ? theme.palette.common.white
-      : theme.palette.common.black,
+      : theme.palette.grey[900],
   "& .MuiAlert-icon": {
     color:
-      theme.palette.mode === "dark" ? theme.palette.common.white : "inherit",
+      theme.palette.mode === "dark"
+        ? alpha(theme.palette[severity].light, 0.9)
+        : theme.palette[severity].dark,
+    marginRight: theme.spacing(1.5),
   },
   "& .MuiAlert-message": {
-    fontWeight: 500,
+    fontSize: "1rem",
+    letterSpacing: "0.02em",
+    textShadow:
+      theme.palette.mode === "dark"
+        ? "0 1px 2px rgba(0, 0, 0, 0.5)"
+        : "0 1px 2px rgba(0, 0, 0, 0.1)",
+  },
+  "& .MuiAlert-action": {
+    color:
+      theme.palette.mode === "dark"
+        ? theme.palette[severity].light
+        : theme.palette[severity].dark,
   },
 }));
 
 // Helper functions
-const formatDateTime = (date) => {
+const formatTimestamp = (date) => {
   if (!date) return "";
-  const d = new Date(date);
-  const day = String(d.getDate()).padStart(2, "0");
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const year = d.getFullYear();
-  const hours = String(d.getHours()).padStart(2, "0");
-  const minutes = String(d.getMinutes()).padStart(2, "0");
-  const seconds = String(d.getSeconds()).padStart(2, "0");
-  return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
+  const utcDate = new Date(date);
+  // Add 5 hours and 30 minutes (5.5 hours = 5 * 60 * 60 * 1000 + 30 * 60 * 1000 = 19,800,000 ms)
+  const offsetMs = 5.5 * 60 * 60 * 1000;
+  const localDate = new Date(utcDate.getTime() + offsetMs);
+  // Format as ISO-like string without timezone indicator (since it's now local time)
+  return localDate.toISOString().replace(".000Z", " "); // e.g., "2025-04-07T17:30:00.000 +05:30"
+};
+
+const createExactISOString = (dateTimeString) => {
+  if (!dateTimeString) return "";
+  const localDate = new Date(dateTimeString);
+  const utcDate = new Date(
+    Date.UTC(
+      localDate.getUTCFullYear(),
+      localDate.getUTCMonth(),
+      localDate.getUTCDate(),
+      localDate.getUTCHours(),
+      localDate.getUTCMinutes(),
+      localDate.getUTCSeconds()
+    )
+  );
+  return utcDate.toISOString();
 };
 
 const pivotData = (data) => {
@@ -209,7 +259,6 @@ const deleteQueryFromLocalStorage = (index) => {
 };
 
 const LogView = () => {
-  const theme = useTheme();
   const [queries, setQueries] = useState([]);
   const [selectedQuery, setSelectedQuery] = useState("");
   const [dateFilter, setDateFilter] = useState({ from: "", to: "" });
@@ -281,10 +330,17 @@ const LogView = () => {
 
     setIsLoading(true);
     try {
+      const fromDateISO = createExactISOString(dateFilter.from);
+      const toDateISO = createExactISOString(dateFilter.to);
+
+      console.log(
+        `Executing query with UTC time: from=${fromDateISO} to=${toDateISO}`
+      );
+
       const response = await axios.post(`${BASE_URL}/execute-query`, {
         qName: selectedQuery,
-        fromDate: new Date(dateFilter.from).toISOString(),
-        toDate: new Date(dateFilter.to).toISOString(),
+        fromDate: fromDateISO,
+        toDate: toDateISO,
       });
 
       const { pivotedData } = pivotData(response.data);
@@ -328,10 +384,13 @@ const LogView = () => {
 
     setIsLoading(true);
     try {
+      const fromDateISO = createExactISOString(savedQuery.from);
+      const toDateISO = createExactISOString(savedQuery.to);
+
       const response = await axios.post(`${BASE_URL}/execute-query`, {
         qName: savedQuery.name,
-        fromDate: new Date(savedQuery.from).toISOString(),
-        toDate: new Date(savedQuery.to).toISOString(),
+        fromDate: fromDateISO,
+        toDate: toDateISO,
       });
 
       const { pivotedData } = pivotData(response.data);
@@ -372,7 +431,7 @@ const LogView = () => {
     queryResults.forEach((row) => {
       const values = headers.map((header) => {
         if (header === "TimeStamp") {
-          return `"${formatDateTime(row[header])}"`;
+          return `"${formatTimestamp(row[header])}"`;
         } else if (row[header] === 0) {
           return `"0"`;
         } else {
@@ -412,43 +471,39 @@ const LogView = () => {
     doc.text(`${selectedQuery} Report`, 20, 20);
 
     doc.setFontSize(12);
+    const fromDate = new Date(dateFilter.from);
+    const toDate = new Date(dateFilter.to);
     doc.text(
-      `From: ${formatDateTime(dateFilter.from)} To: ${formatDateTime(
-        dateFilter.to
-      )}`,
+      `From: ${formatTimestamp(fromDate)} To: ${formatTimestamp(toDate)}`,
       20,
       30
     );
 
     const tableData = queryResults.map((row) =>
-      headers.map((header) =>
-        header === "TimeStamp"
-          ? formatDateTime(row[header])
-          : row[header] === 0
-          ? "0"
-          : row[header] !== null && row[header] !== undefined
-          ? row[header]
-          : "NA"
-      )
+      headers.map((header) => {
+        if (header === "TimeStamp") {
+          return formatTimestamp(row[header]);
+        } else {
+          return row[header] === 0
+            ? "0"
+            : row[header] !== null && row[header] !== undefined
+            ? row[header]
+            : "NA";
+        }
+      })
     );
 
     autoTable(doc, {
       startY: 50,
       head: [headers],
       body: tableData,
-      styles: {
-        fontSize: 10,
-        cellPadding: 3,
-        overflow: "linebreak",
-      },
+      styles: { fontSize: 10, cellPadding: 3, overflow: "linebreak" },
       headStyles: {
         fillColor: [33, 150, 243],
         textColor: [255, 255, 255],
         fontStyle: "bold",
       },
-      alternateRowStyles: {
-        fillColor: [245, 245, 245],
-      },
+      alternateRowStyles: { fillColor: [245, 245, 245] },
       tableLineColor: [200, 200, 200],
       tableLineWidth: 0.1,
     });
@@ -459,7 +514,7 @@ const LogView = () => {
       doc.setFontSize(8);
       doc.setTextColor(100);
       doc.text(
-        `Page ${i} of ${pageCount} | Generated on ${formatDateTime(
+        `Page ${i} of ${pageCount} | Generated on ${formatTimestamp(
           new Date()
         )}`,
         20,
@@ -481,14 +536,16 @@ const LogView = () => {
     const headers = Object.keys(queryResults[0]).filter((key) => key !== "id");
     const data = queryResults.map((row) =>
       headers.reduce((acc, header) => {
-        acc[header] =
-          header === "TimeStamp"
-            ? formatDateTime(row[header])
-            : row[header] === 0
-            ? "0"
-            : row[header] !== null && row[header] !== undefined
-            ? row[header]
-            : "NA";
+        if (header === "TimeStamp") {
+          acc[header] = formatTimestamp(row[header]);
+        } else {
+          acc[header] =
+            row[header] === 0
+              ? "0"
+              : row[header] !== null && row[header] !== undefined
+              ? row[header]
+              : "NA";
+        }
         return acc;
       }, {})
     );
@@ -529,10 +586,10 @@ const LogView = () => {
       {
         field: "TimeStamp",
         headerName: "Timestamp",
-        width: 200,
+        width: 250,
         renderCell: (params) => (
           <Typography variant="body2" sx={{ fontWeight: 500 }}>
-            {formatDateTime(params.value)}
+            {formatTimestamp(params.value)}
           </Typography>
         ),
       },
@@ -559,7 +616,8 @@ const LogView = () => {
         open={snackbar.open}
         autoHideDuration={5000}
         onClose={handleSnackbarClose}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
+        sx={{ mt: "3%" }}
       >
         <StyledAlert
           elevation={6}
@@ -570,7 +628,6 @@ const LogView = () => {
           {snackbar.message}
         </StyledAlert>
       </Snackbar>
-
       <StyledPaper>
         <GlassCard sx={{ mb: 4 }}>
           <CardContent>
@@ -599,9 +656,7 @@ const LogView = () => {
                 anchorEl={anchorEl}
                 open={Boolean(anchorEl)}
                 onClose={handleCloseSavedQueries}
-                PaperProps={{
-                  style: { maxHeight: 400, width: "500px" },
-                }}
+                PaperProps={{ style: { maxHeight: 400, width: "500px" } }}
               >
                 {savedQueries.length === 0 ? (
                   <MenuItem disabled>No saved queries</MenuItem>
@@ -616,26 +671,25 @@ const LogView = () => {
                       }}
                     >
                       <Typography variant="body2" sx={{ mr: 2 }}>
-                        {query.displayName} | {formatDateTime(query.from)} -{" "}
-                        {formatDateTime(query.to)}
+                        {query.displayName} | {formatTimestamp(query.from)} -{" "}
+                        {formatTimestamp(query.to)}
                       </Typography>
                       <Box>
-                        <Button
+                        <IconButton
                           size="small"
-                          startIcon={<PlayArrowIcon />}
                           onClick={() => handleLoadAndExecuteQuery(query)}
                           sx={{ mr: 1 }}
+                          color="primary"
                         >
-                          Execute
-                        </Button>
-                        <Button
+                          <PlayArrowIcon />
+                        </IconButton>
+                        <IconButton
                           size="small"
-                          startIcon={<DeleteIcon />}
                           onClick={() => handleDeleteQuery(index)}
                           color="error"
                         >
-                          Delete
-                        </Button>
+                          <DeleteIcon />
+                        </IconButton>
                       </Box>
                     </MenuItem>
                   ))

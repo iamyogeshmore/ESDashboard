@@ -18,6 +18,7 @@ import {
 } from "@mui/icons-material";
 import DeleteConfirmationDialog from "../DeleteConfirmationDialog";
 
+// ------------------- Timestamp Formatting Function -------------------
 const formatTimestamp = (timestamp) => {
   if (!timestamp) return "No timestamp available";
   const date = new Date(timestamp);
@@ -29,29 +30,28 @@ const formatTimestamp = (timestamp) => {
     minute: "2-digit",
     second: "2-digit",
     hour12: false,
-    timeZone: "UTC",
+    timeZone: "Asia/Kolkata",
+
   });
 };
 
-// Custom default widget settings from WidgetProperties
+// ------------------ Default Widget Settings ------------------
 const customDefaultWidgetSettings = {
-  backgroundColor: "#000000",
-  borderColor: "#ffffff",
+  backgroundColor: "#334155",
+  borderColor: "#94A3B8",
   borderRadius: "3px",
-  borderWidth: "1px",
-  titleColor: "#ffffff",
+  borderWidth: "2px",
+  titleColor: "#E2E8F0",
   titleFontFamily: "Arial",
-  titleFontSize: "24px",
+  titleFontSize: "20px",
   titleFontStyle: "normal",
   titleFontWeight: "normal",
   titleTextDecoration: "none",
-  valueColor: "#e0e0e0",
+  valueColor: "#FFFFFF",
   valueFontFamily: "Arial",
-  valueFontSize: "24px",
+  valueFontSize: "30px",
   valueFontStyle: "normal",
-  valueFontWeight: "normal",
-  valueTextDecoration: "none",
-  widgetName: "Custom Widget",
+  valueFontWeight: "bold",
 };
 
 const NumberWidget = ({
@@ -75,6 +75,7 @@ const NumberWidget = ({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const menuButtonRef = useRef(null);
 
+  // ------------------- Widget Settings from Local Storage -------------------
   const styles = useMemo(() => {
     const storedSettings = widgetId
       ? localStorage.getItem(`widgetSettings_${widgetId}`)
@@ -95,6 +96,7 @@ const NumberWidget = ({
       : baseStyles;
   }, [widgetId, initialProperties, isDarkMode]);
 
+  // ------------------- Effect to Fetch Value -------------------
   useEffect(() => {
     if (!fetchValue || externalValue !== undefined) return;
 
@@ -104,15 +106,21 @@ const NumberWidget = ({
     const loadValue = async () => {
       try {
         const fetchedData = await fetchValue({ signal: controller.signal });
-        if (
-          fetchedData.value !== null &&
-          fetchedData.value !== undefined &&
-          !isNaN(fetchedData.value) &&
-          isMounted
-        ) {
-          setInternalValue(fetchedData.value);
-          setInternalTimestamp(fetchedData.timestamp);
-          setError(null);
+        if (isMounted) {
+          if (
+            fetchedData.message === "No measurement data found" ||
+            fetchedData.value === null ||
+            fetchedData.value === undefined ||
+            isNaN(fetchedData.value)
+          ) {
+            setInternalValue("N/A");
+            setInternalTimestamp(fetchedData.timestamp || null);
+            setError(null);
+          } else {
+            setInternalValue(fetchedData.value);
+            setInternalTimestamp(fetchedData.timestamp);
+            setError(null);
+          }
         }
       } catch (err) {
         if (!controller.signal.aborted) {
@@ -305,9 +313,11 @@ const NumberWidget = ({
           >
             {error
               ? "Error"
+              : displayValue === "N/A"
+              ? "N/A"
               : displayValue !== null && displayValue !== undefined
               ? displayValue.toFixed(styles.decimalPlaces || 2)
-              : ""}
+              : "N/A"}
           </Typography>
         </Box>
 

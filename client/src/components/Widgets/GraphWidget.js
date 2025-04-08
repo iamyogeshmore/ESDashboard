@@ -52,6 +52,7 @@ ChartJS.register(
   Filler
 );
 
+// --------------------- Timezone and date formatting ---------------------
 const formatTimestamp = (timestamp) => {
   if (!timestamp) return "No timestamp available";
   const date = new Date(timestamp);
@@ -63,32 +64,37 @@ const formatTimestamp = (timestamp) => {
     minute: "2-digit",
     second: "2-digit",
     hour12: false,
-    timeZone: "UTC",
+    timeZone: "Asia/Kolkata",
   });
 };
 
+// -------------------- Default widget settings --------------------
 const customDefaultWidgetSettings = {
-  backgroundColor: "#000000",
-  borderColor: "#ffffff",
+  backgroundColor: "#334155",
+  borderColor: "#94A3B8",
   borderRadius: "3px",
-  borderWidth: "1px",
-  titleColor: "#ffffff",
+  borderWidth: "2px",
+  titleColor: "#E2E8F0",
   titleFontFamily: "Arial",
-  titleFontSize: "24px",
+  titleFontSize: "20px",
   titleFontStyle: "normal",
   titleFontWeight: "normal",
   titleTextDecoration: "none",
-  valueColor: "#e0e0e0",
+  valueColor: "#FFFFFF",
   valueFontFamily: "Arial",
-  valueFontSize: "24px",
+  valueFontSize: "30px",
   valueFontStyle: "normal",
-  valueFontWeight: "normal",
+  valueFontWeight: "bold",
   valueTextDecoration: "none",
-  widgetName: "Custom Widget",
 };
 
+// -------------------- Color options for measurands --------------------
 const colorOptions = [
-  { name: "Teal", value: "rgba(0, 128, 128, 1)", bg: "rgba(0, 128, 128, 0.2)" },
+  {
+    name: "teal",
+    value: "rgba(20, 184, 166, 1)",
+    bg: "rgba(20, 184, 166, 0.2)",
+  },
   {
     name: "Purple",
     value: "rgba(128, 0, 128, 1)",
@@ -110,6 +116,7 @@ const colorOptions = [
   { name: "Cyan", value: "rgba(0, 255, 255, 1)", bg: "rgba(0, 255, 255, 0.2)" },
 ];
 
+// ----------------------- Styled components -----------------------
 const GraphPaper = styled(Paper)(
   ({ theme, isDarkMode, isFullscreen, styles }) => ({
     height: isFullscreen ? "100vh" : "100%",
@@ -201,6 +208,7 @@ const ApplyButton = styled(Button)(({ theme, isDarkMode }) => ({
   transition: "all 0.3s ease",
 }));
 
+// ----------------------- Custom Tooltip Positioner -----------------------
 Tooltip.positioners.custom = function (elements, eventPosition) {
   return { x: eventPosition.x, y: eventPosition.y - 20 };
 };
@@ -293,6 +301,7 @@ const GraphWidget = ({
       : baseStyles;
   }, [widgetId, initialProperties, isDarkMode]);
 
+  // -------------------- Fetch data effect --------------------
   useEffect(() => {
     let isMounted = true;
     const fetchData = async () => {
@@ -319,6 +328,7 @@ const GraphWidget = ({
     }
   }, [fetchValue, selectedMeasurands]);
 
+  // -------------------- Fullscreen effect --------------------
   useEffect(() => {
     const handleFullscreenChange = () => {
       if (!document.fullscreenElement && isFullscreen) {
@@ -458,6 +468,7 @@ const GraphWidget = ({
     setColor("Custom");
   };
 
+  //------------------- Comparison options -------------------
   const handleApplySelection = () => {
     if (!measurand) {
       setSnackbarMessage("Please select a measurand to compare");
@@ -496,6 +507,7 @@ const GraphWidget = ({
     setSnackbarOpen(true);
   };
 
+  // ------------------ Delete confirmation dialog ------------------
   const handleDeleteClick = () => setDeleteDialogOpen(true);
   const handleDeleteConfirm = () => {
     onDelete(widgetId);

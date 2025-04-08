@@ -37,8 +37,10 @@ import "../styles/TableDetailsPage.css";
 import { ThemeContext } from "../contexts/ThemeContext";
 import GraphComponent from "../components/Widgets/HDDGraph";
 
+// ------------------ Base API endpoint from environment variables ------------------
 const BASE_URL = `${process.env.REACT_APP_API_LOCAL_URL}api/hdd`;
 
+// ------------------ Format Timestamp Function ------------------
 const formatTimestamp = (timestamp) => {
   if (!timestamp) return "No timestamp available";
   const date = new Date(timestamp);
@@ -50,14 +52,13 @@ const formatTimestamp = (timestamp) => {
     minute: "2-digit",
     second: "2-digit",
     hour12: false,
-    timeZone: "UTC",
+    timeZone: "Asia/Kolkata",
   });
 };
 
-// In-memory cache
+// ------------------ Cache for historical data ------------------
 const historicalCache = {};
 
-// Styled components (unchanged)
 const DifferenceBox = styled(Box)(({ theme, isNegative, isZero }) => ({
   display: "flex",
   alignItems: "center",
@@ -242,7 +243,6 @@ const TableDetailsPage = () => {
   });
 
   const [measurandData, setMeasurandData] = useState({});
-
   const TransitionLeft = (props) => <Slide {...props} direction="left" />;
 
   const showSnackbar = (message, severity = "info", loading = false) => {
@@ -259,15 +259,16 @@ const TableDetailsPage = () => {
   };
 
   const handleTimeRangeClick = (hours) => {
-    const startDate = new Date(dateFilter.start + "Z"); // Ensure UTC by appending "Z"
-    const endDate = new Date(startDate.getTime()); // Clone startDate
-    endDate.setUTCHours(endDate.getUTCHours() + hours); // Add hours in UTC
+    const startDate = new Date(dateFilter.start + "Z");
+    const endDate = new Date(startDate.getTime());
+    endDate.setUTCHours(endDate.getUTCHours() + hours);
     setDateFilter({
       start: startDate.toISOString().slice(0, 16),
       end: endDate.toISOString().slice(0, 16),
     });
   };
 
+  // ------------------ Fetch Table Data ------------------
   const fetchTableData = useCallback(async () => {
     setLoading(true);
     setGridLoading(true);
@@ -300,6 +301,7 @@ const TableDetailsPage = () => {
     }
   }, [tableId]);
 
+  // ------------------ Fetch Available Measurands ------------------
   const fetchAvailableMeasurands = useCallback(async () => {
     if (!table?.plantId || !table?.terminalId) return;
     showSnackbar("Fetching available measurands", "info", true);
@@ -317,6 +319,7 @@ const TableDetailsPage = () => {
     }
   }, [table]);
 
+  // ------------------ Fetch Historical Measurand Values ------------------
   const fetchHistoricalMeasurandValues = useCallback(async () => {
     if (!table?.terminalId || !measurandIds.length) return;
     setGridLoading(true);
@@ -437,6 +440,7 @@ const TableDetailsPage = () => {
     }
   };
 
+  //  ----------------------- Saving configuration -----------------------
   const handleSave = async () => {
     showSnackbar("Saving configuration", "info", true);
     try {

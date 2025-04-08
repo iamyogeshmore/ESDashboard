@@ -20,6 +20,7 @@ import { formatTimestamp } from "./formatTimestamp";
 
 ChartJS.register(ArcElement, ChartTooltip, Legend);
 
+// ------------------ Base API endpoint from environment variables ------------------
 const API_BASE_URL = `${process.env.REACT_APP_API_LOCAL_URL}api`;
 
 const StyledCard = styled(Card)(({ theme, settings }) => ({
@@ -48,14 +49,16 @@ const DashboardGaugeWidget = ({ data, width, height }) => {
   const theme = useTheme();
   const settings = data.settings || {};
   const [measurementData, setMeasurementData] = useState({
-    value: 0,
+    value: null,
     timestamp: null,
   });
 
+  // ----------------------- Fetch Measurement Data ---------------------
   const fetchMeasurementData = useCallback(async () => {
     try {
       const { plantId, terminalId, measurandId } = data;
       if (!plantId || !terminalId || !measurandId) {
+        setMeasurementData({ value: null, timestamp: null });
         return;
       }
 
@@ -64,43 +67,24 @@ const DashboardGaugeWidget = ({ data, width, height }) => {
       );
 
       const latestData = response.data[0];
-      if (latestData) {
-        setMeasurementData({
-          value: parseFloat(latestData.MeasurandValue) || 0,
-          timestamp: latestData.TimeStamp,
-        });
-      }
+      setMeasurementData({
+        value:
+          latestData &&
+          latestData.MeasurandValue !== undefined &&
+          latestData.MeasurandValue !== null
+            ? parseFloat(latestData.MeasurandValue)
+            : null,
+        timestamp: latestData?.TimeStamp || null,
+      });
     } catch (err) {
       console.error("Error fetching measurement data:", err.message);
+      setMeasurementData((prev) => ({ ...prev, value: null }));
     }
   }, [data]);
 
-  useEffect(() => {
-    fetchMeasurementData();
-    const interval = setInterval(fetchMeasurementData, 5000);
-    return () => clearInterval(interval);
-  }, [data.plant, data.terminal, data.measurement, fetchMeasurementData]);
-
-  const minValue = data.minRange || 0;
-  const maxValue = data.maxRange || 100;
-  const displayValue = Math.max(
-    minValue,
-    Math.min(maxValue, measurementData.value)
-  );
-  const range = maxValue - minValue;
-  const gaugeValue = ((displayValue - minValue) / range) * 100;
-
-  const ranges = data.ranges || [
-    { start: minValue, end: minValue + range / 3, color: "#ff5252" },
-    {
-      start: minValue + range / 3,
-      end: minValue + (2 * range) / 3,
-      color: "#ffeb3b",
-    },
-    { start: minValue + (2 * range) / 3, end: maxValue, color: "#4caf50" },
-  ];
-
+  // ----------------------- Get Gauge Color ---------------------
   const getGaugeColor = () => {
+    if (!isNumeric) return settings.gaugeColor || "#1976d2";
     for (const range of ranges) {
       if (displayValue >= range.start && displayValue <= range.end) {
         return range.color;
@@ -109,10 +93,56 @@ const DashboardGaugeWidget = ({ data, width, height }) => {
     return settings.gaugeColor || "#1976d2";
   };
 
+  useEffect(() => {
+    fetchMeasurementData();
+    const interval = setInterval(fetchMeasurementData, 5000);
+    return () => clearInterval(interval);
+  }, [fetchMeasurementData]);
+
+  const minValue = data.minRange || 0;
+  const maxValue = data.maxRange || 100;
+
+  const displayValue =
+    measurementData.value === null || measurementData.value === undefined
+      ? "N/A"
+      : measurementData.value;
+  const isNumeric = typeof displayValue === "number";
+
+  // Calculate gaugeValue for visualization, still respecting min/max for the gauge arc
+  const gaugeValue = isNumeric
+    ? Math.max(
+        0,
+        Math.min(
+          100,
+          ((Math.max(minValue, Math.min(maxValue, displayValue)) - minValue) /
+            (maxValue - minValue)) *
+            100
+        )
+      )
+    : 0;
+
+  const ranges = data.ranges || [
+    {
+      start: minValue,
+      end: minValue + (maxValue - minValue) / 3,
+      color: "#ff5252",
+    },
+    {
+      start: minValue + (maxValue - minValue) / 3,
+      end: minValue + (2 * (maxValue - minValue)) / 3,
+      color: "#ffeb3b",
+    },
+    {
+      start: minValue + (2 * (maxValue - minValue)) / 3,
+      end: maxValue,
+      color: "#4caf50",
+    },
+  ];
+
   const chartData = {
     datasets: [
       {
-        data: [gaugeValue, 100 - gaugeValue],
+        data: [isNumeric ? gaugeValue : 0, isNumeric ? 100 - gaugeValue : 100],
         backgroundColor: [getGaugeColor(), theme.palette.grey[200]],
         borderWidth: 0,
         circumference: 270,
@@ -134,9 +164,11 @@ const DashboardGaugeWidget = ({ data, width, height }) => {
     },
   };
 
-  const tooltipTitle = `Last sync: ${formatTimestamp(
-    measurementData.timestamp
-  )}\nMin Range: ${minValue}\nMax Range: ${maxValue}`;
+  const tooltipTitle = measurementData.timestamp
+    ? `Last sync: ${formatTimestamp(
+        measurementData.timestamp
+      )}\nMin Range: ${minValue}\nMax Range: ${maxValue}\nActual Value: ${displayValue}`
+    : "No timestamp available";
 
   return (
     <Tooltip title={<pre>{tooltipTitle}</pre>} arrow>
@@ -146,8 +178,6 @@ const DashboardGaugeWidget = ({ data, width, height }) => {
             height: "100%",
             display: "flex",
             flexDirection: "column",
-            padding: 2,
-            paddingBottom: 0,
           }}
         >
           <Typography
@@ -159,10 +189,9 @@ const DashboardGaugeWidget = ({ data, width, height }) => {
               textDecoration: settings.titleTextDecoration || "none",
               color: settings.titleColor || "#000000",
               textAlign: "center",
-              mb: 1,
             }}
           >
-            {data.name || "Gauge Widget"}
+            {data.name}
           </Typography>
           <GaugeContainer>
             <Box sx={{ position: "relative", width: "100%", height: "100%" }}>
@@ -186,9 +215,11 @@ const DashboardGaugeWidget = ({ data, width, height }) => {
                   textDecoration: settings.valueTextDecoration || "none",
                 }}
               >
-                {displayValue.toFixed(data.decimals || 1)}
+                {isNumeric
+                  ? displayValue.toFixed(data.decimals || 1)
+                  : displayValue}
               </Typography>
-              {data.unit && (
+              {data.unit && isNumeric && (
                 <Typography
                   sx={{
                     position: "absolute",
