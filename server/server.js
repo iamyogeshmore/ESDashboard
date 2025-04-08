@@ -10,7 +10,7 @@ const viewRoutes = require("./routes/viewRoutes");
 const hddRoutes = require("./routes/hddRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 const queryRoutes = require("./routes/logRoutes");
-
+const widgetTemplateRoutes = require("./routes/widgetTemplateRoutes");
 const app = express();
 
 // Middleware
@@ -106,6 +106,7 @@ app.use("/api", viewRoutes);
 app.use("/api/hdd", hddRoutes);
 app.use("/api", dashboardRoutes);
 app.use("/api", queryRoutes);
+app.use("/api", widgetTemplateRoutes); // Add widget template routes
 
 // Error handling middleware
 app.use((err, req, res, next) => {

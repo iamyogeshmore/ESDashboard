@@ -1,4 +1,5 @@
 const Dashboard = require("../models/Dashboard");
+const ESBeacon = require("../models/ESBeacon");
 
 // -------------------- 1. Creates a new dashboard with provided name and optional widgets --------------------
 exports.createDashboard = async (req, res) => {
@@ -213,5 +214,55 @@ exports.deleteDashboard = async (req, res) => {
     };
   } catch (error) {
     return { status: 500, error: "Server error", message: error.message };
+  }
+};
+// -------------------- 11. Updates properties for a specific widget in a dashboard --------------------
+// Modified updateWidgetProperties function
+exports.updateWidgetProperties = async (req, res) => {
+  try {
+    const { widgetId } = req.params; // Removed 'name' parameter
+    const properties = req.body;
+
+    if (!properties || Object.keys(properties).length === 0) {
+      return { status: 400, error: "Properties are required" };
+    }
+
+    // Find the dashboard containing this widget
+    const dashboard = await Dashboard.findOne({
+      "widgets.id": Number(widgetId),
+    });
+    if (!dashboard) {
+      return { status: 404, error: "Dashboard or widget not found" };
+    }
+
+    const widgetIndex = dashboard.widgets.findIndex(
+      (w) => w.id === Number(widgetId)
+    );
+    if (widgetIndex === -1) {
+      return { status: 404, error: "Widget not found" };
+    }
+
+    // Update widget properties
+    dashboard.widgets[widgetIndex].settings = {
+      ...dashboard.widgets[widgetIndex].settings,
+      ...properties,
+    };
+    dashboard.updatedAt = Date.now();
+
+    await dashboard.save();
+    return { status: 200, data: dashboard.widgets[widgetIndex] };
+  } catch (error) {
+    return { status: 500, error: "Server error", message: error.message };
+  }
+};
+
+// -------------------- 12. Retrieves all beacons from the database --------------------
+exports.GetBeacons = async (req, res) => {
+  try {
+    const beacon = await ESBeacon.find();
+    res.status(200).json(beacon);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to fetch beacons" });
   }
 };

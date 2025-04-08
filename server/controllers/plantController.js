@@ -69,7 +69,9 @@ exports.getMeasurementData = async (req, res) => {
     const query = {
       PlantId: isNaN(Number(plantId)) ? plantId : Number(plantId), // Handle both string and number IDs
       TerminalId: isNaN(Number(terminalId)) ? terminalId : Number(terminalId),
-      "MeasurandDetails.MeasurandId": isNaN(Number(measurandId)) ? measurandId : Number(measurandId),
+      "MeasurandDetails.MeasurandId": isNaN(Number(measurandId))
+        ? measurandId
+        : Number(measurandId),
     };
 
     const data = await ESPlantTerminal.find(query)

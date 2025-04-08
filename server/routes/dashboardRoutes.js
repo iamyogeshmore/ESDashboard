@@ -138,5 +138,21 @@ router.put(
     }
   }
 );
+// -------------------- 11. Updates widget properties for a specific widget in a dashboard --------------------
+// Modified route for updating widget properties
+router.patch("/dashboards/widgets/:widgetId/properties", async (req, res) => {
+  const result = await dashboardController.updateWidgetProperties(req, res);
+  if (result.status === 200) {
+    broadcastUpdate({ type: "widgetPropertiesUpdated", data: result.data });
+    res.status(200).json(result.data);
+  } else {
+    res
+      .status(result.status)
+      .json({ error: result.error, message: result.message });
+  }
+});
+
+// -------------------- 12. Pop up beacons --------------------
+router.get("/getbeacons", dashboardController.GetBeacons);
 
 module.exports = router;

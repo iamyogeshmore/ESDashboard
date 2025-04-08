@@ -39,7 +39,7 @@ const WidgetSchema = new mongoose.Schema({
   layout: {
     i: { type: String, required: true },
     x: { type: Number, required: true },
-    y: { type: Number, required: true },
+    y: { type: Number, default: 0 },
     w: { type: Number, required: true },
     h: { type: Number, required: true },
   },
