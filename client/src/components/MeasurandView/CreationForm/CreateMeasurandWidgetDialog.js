@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -13,6 +13,7 @@ import {
   Button,
   FormControlLabel,
 } from "@mui/material";
+import axios from "axios";
 
 const CreateMeasurandWidgetDialog = ({
   open,
@@ -22,8 +23,8 @@ const CreateMeasurandWidgetDialog = ({
 }) => {
   const [newWidget, setNewWidget] = useState({
     plantName: "",
-    scriptName: "",
     terminalName: "",
+    measurandName: "",
     widgetName: "",
     unit: "",
     decimalPlaces: "2",
@@ -31,28 +32,51 @@ const CreateMeasurandWidgetDialog = ({
     graphType: "simple",
     xAxisRecords: "10",
   });
+  const [plants, setPlants] = useState([]);
+  const [terminals, setTerminals] = useState([]);
+  const [measurands, setMeasurands] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  // Static data
-  const plantOptions = ["Plant A", "Plant B", "Plant C"];
-  const scriptOptions = {
-    "Plant A": ["Script 1", "Script 2"],
-    "Plant B": ["Script 3", "Script 4"],
-    "Plant C": ["Script 5", "Script 6"],
-  };
-  const terminalOptions = {
-    "Plant A": {
-      "Script 1": ["Terminal 1A", "Terminal 1B"],
-      "Script 2": ["Terminal 2A", "Terminal 2B"],
-    },
-    "Plant B": {
-      "Script 3": ["Terminal 3A", "Terminal 3B"],
-      "Script 4": ["Terminal 4A", "Terminal 4B"],
-    },
-    "Plant C": {
-      "Script 5": ["Terminal 5A", "Terminal 5B"],
-      "Script 6": ["Terminal 6A", "Terminal 6B"],
-    },
-  };
+  const API_BASE_URL = "http://localhost:6005/api"; // Adjust based on your server config
+
+  // Fetch all plants on component mount
+  useEffect(() => {
+    if (open) {
+      setLoading(true);
+      axios
+        .get(`${API_BASE_URL}/plants`)
+        .then((response) => {
+          setPlants(response.data);
+          setLoading(false);
+        })
+        .catch((error) => {
+          console.error("Error fetching plants:", error);
+          setLoading(false);
+        });
+    }
+  }, [open]);
+
+  // Fetch terminals and measurands when plantName changes
+  useEffect(() => {
+    if (newWidget.plantName) {
+      setLoading(true);
+      Promise.all([
+        axios.get(`${API_BASE_URL}/measurands/plant/${newWidget.plantName}`),
+        axios.get(
+          `${API_BASE_URL}/terminals/plant/${newWidget.plantName}/measurand/1`
+        ), // Assuming measurandId=1 for simplicity
+      ])
+        .then(([measurandsRes, terminalsRes]) => {
+          setMeasurands(measurandsRes.data);
+          setTerminals(terminalsRes.data);
+          setLoading(false);
+        })
+        .catch((error) => {
+          console.error("Error fetching data:", error);
+          setLoading(false);
+        });
+    }
+  }, [newWidget.plantName]);
 
   const handleNewWidgetChange = (field) => (event) => {
     const value =
@@ -60,15 +84,15 @@ const CreateMeasurandWidgetDialog = ({
     setNewWidget((prev) => ({
       ...prev,
       [field]: value,
-      ...(field === "plantName" && { scriptName: "", terminalName: "" }),
-      ...(field === "scriptName" && { terminalName: "" }),
+      ...(field === "plantName" && { terminalName: "", measurandName: "" }),
+      ...(field === "measurandName" && { terminalName: "" }),
     }));
   };
 
   const handleCreate = () => {
     if (
       !newWidget.plantName ||
-      !newWidget.scriptName ||
+      !newWidget.measurandName ||
       !newWidget.terminalName ||
       !newWidget.widgetName
     ) {
@@ -82,8 +106,8 @@ const CreateMeasurandWidgetDialog = ({
   const handleClose = () => {
     setNewWidget({
       plantName: "",
-      scriptName: "",
       terminalName: "",
+      measurandName: "",
       widgetName: "",
       unit: "",
       decimalPlaces: "2",
@@ -98,50 +122,57 @@ const CreateMeasurandWidgetDialog = ({
     <Dialog open={open} onClose={handleClose}>
       <DialogTitle>Create New Measurand Widget</DialogTitle>
       <DialogContent>
-        <FormControl fullWidth sx={{ mt: 2 }}>
+        <FormControl fullWidth sx={{ mt: 2 }} disabled={loading}>
           <InputLabel>Plant</InputLabel>
           <Select
             value={newWidget.plantName}
             label="Plant"
             onChange={handleNewWidgetChange("plantName")}
           >
-            {plantOptions.map((plant) => (
-              <MenuItem key={plant} value={plant}>
-                {plant}
+            {plants.map((plant) => (
+              <MenuItem key={plant.PlantId} value={plant.PlantId}>
+                {plant.PlantName}
               </MenuItem>
             ))}
           </Select>
         </FormControl>
 
-        <FormControl fullWidth sx={{ mt: 2 }}>
-          <InputLabel>Script</InputLabel>
+        <FormControl
+          fullWidth
+          sx={{ mt: 2 }}
+          disabled={!newWidget.plantName || loading}
+        >
+          <InputLabel>Measurand</InputLabel>
           <Select
-            value={newWidget.scriptName}
-            label="Script"
-            onChange={handleNewWidgetChange("scriptName")}
-            disabled={!newWidget.plantName}
+            value={newWidget.measurandName}
+            label="Measurand"
+            onChange={handleNewWidgetChange("measurandName")}
           >
-            {(scriptOptions[newWidget.plantName] || []).map((script) => (
-              <MenuItem key={script} value={script}>
-                {script}
+            {measurands.map((measurand) => (
+              <MenuItem
+                key={measurand.MeasurandId}
+                value={measurand.MeasurandId}
+              >
+                {measurand.MeasurandName}
               </MenuItem>
             ))}
           </Select>
         </FormControl>
 
-        <FormControl fullWidth sx={{ mt: 2 }}>
+        <FormControl
+          fullWidth
+          sx={{ mt: 2 }}
+          disabled={!newWidget.measurandName || loading}
+        >
           <InputLabel>Terminal</InputLabel>
           <Select
             value={newWidget.terminalName}
             label="Terminal"
             onChange={handleNewWidgetChange("terminalName")}
-            disabled={!newWidget.plantName || !newWidget.scriptName}
           >
-            {(
-              terminalOptions[newWidget.plantName]?.[newWidget.scriptName] || []
-            ).map((terminal) => (
-              <MenuItem key={terminal} value={terminal}>
-                {terminal}
+            {terminals.map((terminal) => (
+              <MenuItem key={terminal.TerminalId} value={terminal.TerminalId}>
+                {terminal.TerminalName}
               </MenuItem>
             ))}
           </Select>
@@ -222,7 +253,7 @@ const CreateMeasurandWidgetDialog = ({
       <DialogActions>
         <Button onClick={onOpenProperties}>Properties</Button>
         <Button onClick={handleClose}>Cancel</Button>
-        <Button onClick={handleCreate} variant="contained">
+        <Button onClick={handleCreate} variant="contained" disabled={loading}>
           Create
         </Button>
       </DialogActions>

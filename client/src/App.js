@@ -15,7 +15,8 @@ import Viewer from "./pages/DashboardViewer";
 import axios from "axios";
 import { preserveWidgetTemplatesAndClear } from "./components/localStorageUtils";
 import LogView from "./pages/LogView";
-import {AlertContextProviders} from "./contexts/AlertProviders";
+import MeasurandDetailsPage from "./pages/MeasurandDetailsPage";
+import { AlertContextProviders } from "./contexts/AlertProviders";
 
 // ----------------- Base API endpoint from environment variables -----------------
 const API_BASE_URL = `${process.env.REACT_APP_API_LOCAL_URL}api`;
@@ -114,6 +115,10 @@ const App = () => {
             <Route path="/measurand-view" element={<MeasurandView />} />
             <Route path="/viewer" element={<Viewer />} />
             <Route path="/log-view" element={<LogView />} />
+            <Route
+              path="/hdd/measurand/:measurandId"
+              element={<MeasurandDetailsPage />}
+            />
           </Routes>
         </Box>
         <Footer />

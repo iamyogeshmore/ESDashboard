@@ -29,38 +29,32 @@ export const AlertContextProviders = ({ children }) => {
         console.log("✅ API Response:", result);
 
         if (Array.isArray(result) && result.length > 0) {
-          // Filter beacons based on PopUp and Enable
           const validBeacons = result.filter(
             (beacon) => beacon.PopUp === true && beacon.Enable === true
           );
 
-          // Extract messages from BeaconsDetails where Status is true
           const validMessages = validBeacons.flatMap((beacon) =>
             beacon.BeaconsDetails.filter(
               (detail) => detail.Status === true
             ).map((detail) => detail.MessageOcc)
           );
 
-          // Check if there are valid messages to display
           if (validMessages.length > 0) {
             setAlertMessages(validMessages);
             setAlertVisible(true);
 
-            // Enhanced cycling between alerts
             const cycleAlerts = () => {
               setAlertVisible(true);
 
-              // Hide after 10 seconds
               setTimeout(() => {
                 setAlertVisible(false);
 
-                // After hiding, prepare for the next alert
                 setTimeout(() => {
                   setCurrentIndex(
                     (prevIndex) => (prevIndex + 1) % validMessages.length
                   );
-                  cycleAlerts(); // Show the next alert
-                }, 60000); // Wait 1 minute before showing next
+                  cycleAlerts();
+                }, 60000);
               }, 10000);
             };
 
@@ -127,7 +121,7 @@ export const AlertContextProviders = ({ children }) => {
               alignItems: "flex-start",
               overflow: "hidden",
               transition: "all 0.3s ease",
-              position: "relative", // Added position relative for absolute positioning of close button
+              position: "relative",
               "&:hover": {
                 boxShadow: "0 8px 24px rgba(0,0,0,0.16)",
                 backgroundColor: "#ffffff",
@@ -142,7 +136,6 @@ export const AlertContextProviders = ({ children }) => {
               },
             }}
           >
-            {/* Close button positioned absolutely in the top right */}
             <IconButton
               size="small"
               aria-label="close"
@@ -173,7 +166,7 @@ export const AlertContextProviders = ({ children }) => {
                   display: "flex",
                   alignItems: "center",
                   marginBottom: "6px",
-                  paddingRight: "24px", // Added padding to avoid text overlap with close button
+                  paddingRight: "24px",
                 }}
               >
                 <AlertTitle
@@ -192,7 +185,6 @@ export const AlertContextProviders = ({ children }) => {
                 </AlertTitle>
               </Box>
 
-              {/* Message Content with improved typography */}
               <Typography
                 variant="body2"
                 sx={{
@@ -211,7 +203,6 @@ export const AlertContextProviders = ({ children }) => {
                 {alertMessages[currentIndex]}
               </Typography>
 
-              {/* Bottom row with logo and counter */}
               <Box
                 sx={{
                   display: "flex",

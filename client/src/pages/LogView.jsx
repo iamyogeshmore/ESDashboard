@@ -602,7 +602,9 @@ const LogView = () => {
             {params.value === 0
               ? "0"
               : params.value !== null && params.value !== undefined
-              ? params.value
+              ? Number.isFinite(Number(params.value))
+                ? Number(params.value).toFixed(2)
+                : params.value
               : "NA"}
           </Typography>
         ),

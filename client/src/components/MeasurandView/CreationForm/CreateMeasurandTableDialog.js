@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -17,51 +17,86 @@ import {
   Box,
   Divider,
 } from "@mui/material";
+import axios from "axios";
 
 const CreateMeasurandTableDialog = ({ open, onClose, onCreate }) => {
   const [newTable, setNewTable] = useState({
-    plantName: "",
-    scriptName: "",
-    terminalNames: [],
+    plantId: "",
+    measurandId: "",
+    terminalIds: [],
   });
+  const [plants, setPlants] = useState([]);
+  const [measurands, setMeasurands] = useState([]);
+  const [terminals, setTerminals] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  // Static data
-  const plantOptions = ["Plant A", "Plant B", "Plant C"];
-  const scriptOptions = {
-    "Plant A": ["Script 1", "Script 2"],
-    "Plant B": ["Script 3", "Script 4"],
-    "Plant C": ["Script 5", "Script 6"],
-  };
-  const terminalOptions = {
-    "Plant A": {
-      "Script 1": ["Terminal 1A", "Terminal 1B"],
-      "Script 2": ["Terminal 2A", "Terminal 2B"],
-    },
-    "Plant B": {
-      "Script 3": ["Terminal 3A", "Terminal 3B"],
-      "Script 4": ["Terminal 4A", "Terminal 4B"],
-    },
-    "Plant C": {
-      "Script 5": ["Terminal 5A", "Terminal 5B"],
-      "Script 6": ["Terminal 6A", "Terminal 6B"],
-    },
-  };
+  const API_BASE_URL = "http://localhost:6005/api/measurand";
+
+  useEffect(() => {
+    if (open) {
+      setLoading(true);
+      axios
+        .get(`${API_BASE_URL}/plants`)
+        .then((response) => {
+          setPlants(response.data);
+          setLoading(false);
+        })
+        .catch((error) => {
+          console.error("Error fetching plants:", error);
+          setLoading(false);
+        });
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (newTable.plantId) {
+      setLoading(true);
+      axios
+        .get(`${API_BASE_URL}/measurands/plant/${newTable.plantId}`)
+        .then((response) => {
+          setMeasurands(response.data);
+          setLoading(false);
+        })
+        .catch((error) => {
+          console.error("Error fetching measurands:", error);
+          setLoading(false);
+        });
+    }
+  }, [newTable.plantId]);
+
+  useEffect(() => {
+    if (newTable.plantId && newTable.measurandId) {
+      setLoading(true);
+      axios
+        .get(
+          `${API_BASE_URL}/terminals/plant/${newTable.plantId}/measurand/${newTable.measurandId}`
+        )
+        .then((response) => {
+          setTerminals(response.data);
+          setLoading(false);
+        })
+        .catch((error) => {
+          console.error("Error fetching terminals:", error);
+          setLoading(false);
+        });
+    }
+  }, [newTable.plantId, newTable.measurandId]);
 
   const handleNewTableChange = (field) => (event) => {
     const value = event.target.value;
     setNewTable((prev) => ({
       ...prev,
       [field]: value,
-      ...(field === "plantName" && { scriptName: "", terminalNames: [] }),
-      ...(field === "scriptName" && { terminalNames: [] }),
+      ...(field === "plantId" && { measurandId: "", terminalIds: [] }),
+      ...(field === "measurandId" && { terminalIds: [] }),
     }));
   };
 
   const handleCreate = () => {
     if (
-      !newTable.plantName ||
-      !newTable.scriptName ||
-      !newTable.terminalNames.length
+      !newTable.plantId ||
+      !newTable.measurandId ||
+      !newTable.terminalIds.length
     ) {
       onCreate({ error: "Please complete all table fields" });
       return;
@@ -71,7 +106,7 @@ const CreateMeasurandTableDialog = ({ open, onClose, onCreate }) => {
   };
 
   const handleClose = () => {
-    setNewTable({ plantName: "", scriptName: "", terminalNames: [] });
+    setNewTable({ plantId: "", measurandId: "", terminalIds: [] });
     onClose();
   };
 
@@ -89,17 +124,17 @@ const CreateMeasurandTableDialog = ({ open, onClose, onCreate }) => {
       <DialogContent>
         <Grid container spacing={3}>
           <Grid item xs={12}>
-            <FormControl fullWidth>
+            <FormControl fullWidth disabled={loading}>
               <InputLabel id="plant-label">Plant Name</InputLabel>
               <Select
                 labelId="plant-label"
-                value={newTable.plantName}
+                value={newTable.plantId}
                 label="Plant Name"
-                onChange={handleNewTableChange("plantName")}
+                onChange={handleNewTableChange("plantId")}
               >
-                {plantOptions.map((option) => (
-                  <MenuItem key={option} value={option}>
-                    {option}
+                {plants.map((plant) => (
+                  <MenuItem key={plant.PlantId} value={plant.PlantId}>
+                    {plant.PlantName}
                   </MenuItem>
                 ))}
               </Select>
@@ -107,17 +142,20 @@ const CreateMeasurandTableDialog = ({ open, onClose, onCreate }) => {
           </Grid>
 
           <Grid item xs={12}>
-            <FormControl fullWidth disabled={!newTable.plantName}>
-              <InputLabel id="script-label">Script Name</InputLabel>
+            <FormControl fullWidth disabled={!newTable.plantId || loading}>
+              <InputLabel id="measurand-label">Measurand Name</InputLabel>
               <Select
-                labelId="script-label"
-                value={newTable.scriptName}
-                label="Script Name"
-                onChange={handleNewTableChange("scriptName")}
+                labelId="measurand-label"
+                value={newTable.measurandId}
+                label="Measurand Name"
+                onChange={handleNewTableChange("measurandId")}
               >
-                {(scriptOptions[newTable.plantName] || []).map((option) => (
-                  <MenuItem key={option} value={option}>
-                    {option}
+                {measurands.map((measurand) => (
+                  <MenuItem
+                    key={measurand.MeasurandId}
+                    value={measurand.MeasurandId}
+                  >
+                    {measurand.MeasurandName}
                   </MenuItem>
                 ))}
               </Select>
@@ -127,30 +165,40 @@ const CreateMeasurandTableDialog = ({ open, onClose, onCreate }) => {
           <Grid item xs={12}>
             <FormControl
               fullWidth
-              disabled={!newTable.plantName || !newTable.scriptName}
+              disabled={!newTable.plantId || !newTable.measurandId || loading}
             >
               <InputLabel id="terminal-label">Terminal Options</InputLabel>
               <Select
                 labelId="terminal-label"
                 multiple
-                value={newTable.terminalNames}
+                value={newTable.terminalIds}
                 label="Terminal Options"
-                onChange={handleNewTableChange("terminalNames")}
+                onChange={handleNewTableChange("terminalIds")}
                 renderValue={(selected) => (
                   <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
                     {selected.map((value) => (
-                      <Chip key={value} label={value} />
+                      <Chip
+                        key={value}
+                        label={
+                          terminals.find((t) => t.TerminalId === value)
+                            ?.TerminalName
+                        }
+                      />
                     ))}
                   </Box>
                 )}
               >
-                {(terminalOptions[newTable.plantName]?.[newTable.scriptName] ||
-                  []).map((option) => (
-                  <MenuItem key={option} value={option}>
+                {terminals.map((terminal) => (
+                  <MenuItem
+                    key={terminal.TerminalId}
+                    value={terminal.TerminalId}
+                  >
                     <Checkbox
-                      checked={newTable.terminalNames.includes(option)}
+                      checked={newTable.terminalIds.includes(
+                        terminal.TerminalId
+                      )}
                     />
-                    <ListItemText primary={option} />
+                    <ListItemText primary={terminal.TerminalName} />
                   </MenuItem>
                 ))}
               </Select>
@@ -167,9 +215,10 @@ const CreateMeasurandTableDialog = ({ open, onClose, onCreate }) => {
           onClick={handleCreate}
           variant="contained"
           disabled={
-            !newTable.plantName ||
-            !newTable.scriptName ||
-            !newTable.terminalNames.length
+            !newTable.plantId ||
+            !newTable.measurandId ||
+            !newTable.terminalIds.length ||
+            loading
           }
         >
           Create Table

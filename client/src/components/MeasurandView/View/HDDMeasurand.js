@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Snackbar,
@@ -27,6 +27,7 @@ import {
 } from "@mui/icons-material";
 import CreateMeasurandTableDialog from "../CreationForm/CreateMeasurandTableDialog";
 import DeleteConfirmationDialog from "../../DeleteConfirmationDialog";
+import axios from "axios";
 
 const AnimatedCard = styled(Card)(({ theme }) => ({
   backgroundColor: theme.palette.background.paper,
@@ -75,6 +76,14 @@ const HDDMeasurand = () => {
     severity: "success",
   });
 
+  const API_BASE_URL = "http://localhost:6005/api";
+
+  // Fetch existing tables (mocked as local state for now; replace with API if needed)
+  useEffect(() => {
+    // Optionally fetch tables from an API endpoint if you have one
+    // axios.get(`${API_BASE_URL}/tables`).then((response) => setTables(response.data));
+  }, []);
+
   const handleTableCreate = (tableData) => {
     if (tableData.error) {
       setSnackbar({
@@ -85,12 +94,16 @@ const HDDMeasurand = () => {
       return;
     }
 
+    const plant = tableData.plantId; // Assuming plantId is the ID
+    const measurand = tableData.measurandId;
+    const terminalIds = tableData.terminalIds;
+
     const newTable = {
       _id: `table-${Date.now()}`,
       profile: "measurand",
-      plantName: tableData.plantName,
-      scriptName: tableData.scriptName,
-      terminalNames: tableData.terminalNames,
+      plantId: plant,
+      measurandId: measurand,
+      terminalIds: terminalIds,
       createdAt: new Date().toISOString(),
     };
     setTables((prev) => [...prev, newTable]);
@@ -191,7 +204,7 @@ const HDDMeasurand = () => {
                             sx={{ mr: 1, color: "text.secondary" }}
                           />
                           <Typography color="text.secondary">
-                            Plant: {table.plantName}
+                            Plant: {table.plantId}
                           </Typography>
                         </Box>
                         <Box sx={{ display: "flex", alignItems: "center" }}>
@@ -199,11 +212,11 @@ const HDDMeasurand = () => {
                             sx={{ mr: 1, color: "text.secondary" }}
                           />
                           <Typography color="text.secondary">
-                            Script: {table.scriptName}
+                            Measurand: {table.measurandId}
                           </Typography>
                         </Box>
                         <Chip
-                          label={`${table.terminalNames.length} Terminals`}
+                          label={`${table.terminalIds.length} Terminals`}
                           color="primary"
                           variant="outlined"
                           sx={{ alignSelf: "flex-start", mt: 1 }}

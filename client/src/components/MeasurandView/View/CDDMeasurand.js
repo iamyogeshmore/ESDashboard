@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   FormControl,
@@ -32,11 +32,15 @@ import GraphWidget from "../../Widgets/GraphWidget";
 import CreateMeasurandWidgetDialog from "../CreationForm/CreateMeasurandWidgetDialog";
 import WidgetProperties from "../../WidgetProperties";
 import DeleteConfirmationDialog from "../../DeleteConfirmationDialog";
+import axios from "axios";
 
 const CDDMeasurand = () => {
   const [plant, setPlant] = useState("");
-  const [script, setScript] = useState("");
+  const [measurand, setMeasurand] = useState("");
   const [terminals, setTerminals] = useState([]);
+  const [plants, setPlants] = useState([]);
+  const [measurands, setMeasurands] = useState([]);
+  const [terminalOptions, setTerminalOptions] = useState([]);
   const [showWidgets, setShowWidgets] = useState(false);
   const [layout, setLayout] = useState([]);
   const [showGraph, setShowGraph] = useState(false);
@@ -50,100 +54,122 @@ const CDDMeasurand = () => {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarSeverity, setSnackbarSeverity] = useState("success");
+  const [loading, setLoading] = useState(false);
 
-  // Static data
-  const plantOptions = ["Plant A", "Plant B", "Plant C"];
-  const scriptOptions = {
-    "Plant A": ["Script 1", "Script 2"],
-    "Plant B": ["Script 3", "Script 4"],
-    "Plant C": ["Script 5", "Script 6"],
-  };
-  const terminalOptions = {
-    "Plant A": {
-      "Script 1": ["Terminal 1A", "Terminal 1B"],
-      "Script 2": ["Terminal 2A", "Terminal 2B"],
-    },
-    "Plant B": {
-      "Script 3": ["Terminal 3A", "Terminal 3B"],
-      "Script 4": ["Terminal 4A", "Terminal 4B"],
-    },
-    "Plant C": {
-      "Script 5": ["Terminal 5A", "Terminal 5B"],
-      "Script 6": ["Terminal 6A", "Terminal 6B"],
-    },
-  };
+  const API_BASE_URL = "http://localhost:6005/api/measurand";
 
-  // Static widget data
-  const staticWidgetData = {
-    "Terminal 1A": { value: 42, timestamp: "2025-03-07 10:00" },
-    "Terminal 1B": { value: 58, timestamp: "2025-03-07 10:01" },
-    "Terminal 2A": { value: 75, timestamp: "2025-03-07 10:02" },
-    "Terminal 2B": { value: 19, timestamp: "2025-03-07 10:03" },
-    "Terminal 3A": { value: 33, timestamp: "2025-03-07 10:04" },
-    "Terminal 3B": { value: 88, timestamp: "2025-03-07 10:05" },
-    "Terminal 4A": { value: 62, timestamp: "2025-03-07 10:06" },
-    "Terminal 4B": { value: 47, timestamp: "2025-03-07 10:07" },
-    "Terminal 5A": { value: 91, timestamp: "2025-03-07 10:08" },
-    "Terminal 5B": { value: 25, timestamp: "2025-03-07 10:09" },
-    "Terminal 6A": { value: 70, timestamp: "2025-03-07 10:10" },
-    "Terminal 6B": { value: 36, timestamp: "2025-03-07 10:11" },
+  // Fetch plants on mount
+  useEffect(() => {
+    fetchPlants();
+    fetchSavedViews();
+  }, []);
+
+  // Fetch plants
+  const fetchPlants = async () => {
+    setLoading(true);
+    try {
+      const response = await axios.get(`${API_BASE_URL}/plants`);
+      setPlants(response.data);
+    } catch (error) {
+      console.error("Error fetching plants:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const staticGraphData = {
-    "Terminal 1A": [
-      { value: 40, timestamp: "2025-03-07 09:50" },
-      { value: 42, timestamp: "2025-03-07 10:00" },
-    ],
-    "Terminal 1B": [
-      { value: 55, timestamp: "2025-03-07 09:51" },
-      { value: 58, timestamp: "2025-03-07 10:01" },
-    ],
-    // Add more as needed
+  // Fetch measurands when plant changes
+  useEffect(() => {
+    if (plant) {
+      setLoading(true);
+      axios
+        .get(`${API_BASE_URL}/measurands/plant/${plant}`)
+        .then((response) => {
+          setMeasurands(response.data);
+          setLoading(false);
+        })
+        .catch((error) => {
+          console.error("Error fetching measurands:", error);
+          setLoading(false);
+        });
+    }
+  }, [plant]);
+
+  // Fetch terminals when plant and measurand change
+  useEffect(() => {
+    if (plant && measurand) {
+      setLoading(true);
+      axios
+        .get(`${API_BASE_URL}/terminals/plant/${plant}/measurand/${measurand}`)
+        .then((response) => {
+          setTerminalOptions(response.data);
+          setLoading(false);
+        })
+        .catch((error) => {
+          console.error("Error fetching terminals:", error);
+          setLoading(false);
+        });
+    }
+  }, [plant, measurand]);
+
+  // Fetch all saved views
+  const fetchSavedViews = async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/allmeasurandview`);
+      setSavedViews(response.data.data);
+    } catch (error) {
+      console.error("Error fetching saved views:", error);
+      setSnackbarMessage("Error fetching saved views");
+      setSnackbarSeverity("error");
+      setSnackbarOpen(true);
+    }
   };
 
   const allSelected =
-    terminals.length === terminalOptions[plant]?.[script]?.length &&
-    terminalOptions[plant]?.[script]?.length > 0;
+    terminals.length === terminalOptions.length && terminalOptions.length > 0;
 
   const handleTerminalChange = (event) => {
     const value = event.target.value;
     if (value.includes("selectAll")) {
-      setTerminals(allSelected ? [] : terminalOptions[plant][script]);
+      setTerminals(allSelected ? [] : terminalOptions.map((t) => t.TerminalId));
     } else {
       setTerminals(value);
     }
   };
 
   const handleGoClick = () => {
-    if (!plant || !script || !terminals.length) {
+    if (!plant || !measurand || !terminals.length) {
       setSnackbarMessage(
-        "Please select a plant, script, and at least one terminal"
+        "Please select a plant, measurand, and at least one terminal"
       );
       setSnackbarSeverity("warning");
       setSnackbarOpen(true);
       return;
     }
 
-    const newWidgets = terminals.map((terminal, index) => ({
-      plantName: plant,
-      scriptName: script,
-      terminalName: terminal,
-      displayName: terminal,
-      widgetType: showGraph ? "graph" : "number",
-      decimalPlaces: 2,
-      graphType: showGraph ? "area" : null,
-      xAxisConfiguration: showGraph ? "time:timestamp" : null,
-      refreshInterval: 10000,
-      position: {
-        x: (index % 3) * 4,
-        y: Math.floor(index / 3) * 4,
-        width: showGraph ? 6 : 4,
-        height: showGraph ? 6 : 4,
-      },
-      i: `${terminal}${showGraph ? "-graph" : ""}`,
-      value: staticWidgetData[terminal]?.value || null,
-      timestamp: staticWidgetData[terminal]?.timestamp || null,
-    }));
+    setLoading(true);
+    const newWidgets = terminals.map((terminalId, index) => {
+      const terminal = terminalOptions.find((t) => t.TerminalId === terminalId);
+      return {
+        plantId: plant,
+        measurandId: measurand,
+        terminalId: terminalId,
+        displayName: terminal.TerminalName,
+        widgetType: showGraph ? "graph" : "number",
+        decimalPlaces: 2,
+        graphType: showGraph ? "area" : null,
+        xAxisConfiguration: showGraph ? "time:timestamp" : null,
+        refreshInterval: 10000,
+        position: {
+          x: (index % 3) * 4,
+          y: Math.floor(index / 3) * 4,
+          width: showGraph ? 6 : 4,
+          height: showGraph ? 6 : 4,
+        },
+        i: `${terminal.TerminalName}${showGraph ? "-graph" : ""}`,
+        value: null,
+        timestamp: null,
+      };
+    });
 
     setCreatedWidgets(newWidgets);
     setLayout(
@@ -160,14 +186,15 @@ const CDDMeasurand = () => {
       }))
     );
     setSelectionInfo({
-      plantName: plant,
-      scriptName: script,
-      terminalNames: [...terminals],
+      plantId: plant,
+      measurandId: measurand,
+      terminalIds: [...terminals],
       viewType: showGraph ? "Graph" : "Number",
       timestamp: new Date().toLocaleString(),
     });
     setShowWidgets(true);
     setSelectedView("");
+    setLoading(false);
   };
 
   const onLayoutChange = (newLayout) => {
@@ -195,50 +222,138 @@ const CDDMeasurand = () => {
     );
   };
 
-  const handleSaveView = () => {
+  // Save a new view to the backend
+  const handleSaveView = async () => {
+    if (!plant || !measurand || !terminals.length || !createdWidgets.length) {
+      setSnackbarMessage("Cannot save view: Missing required data");
+      setSnackbarSeverity("warning");
+      setSnackbarOpen(true);
+      return;
+    }
+
     const viewData = {
-      name: `View-${Date.now()}`,
-      plant,
-      script,
-      terminals,
-      widgets: createdWidgets,
+      plantId: plant,
+      measurandId: measurand,
+      terminalIds: terminals,
+      plantName: plants.find((p) => p.PlantId === plant)?.PlantName || "",
+      measurandName:
+        measurands.find((m) => m.MeasurandId === measurand)?.MeasurandName ||
+        "",
+      terminalNames: terminals.map(
+        (tId) =>
+          terminalOptions.find((t) => t.TerminalId === tId)?.TerminalName || ""
+      ),
     };
-    setSavedViews((prev) => [...prev, viewData]);
-    setSnackbarMessage("View saved successfully!");
-    setSnackbarSeverity("success");
-    setSnackbarOpen(true);
+
+    try {
+      const response = await axios.post(`${API_BASE_URL}/create`, viewData);
+      setSavedViews((prev) => [...prev, response.data.data]);
+      setSnackbarMessage("View saved successfully!");
+      setSnackbarSeverity("success");
+      setSnackbarOpen(true);
+    } catch (error) {
+      console.error("Error saving view:", error);
+      setSnackbarMessage("Error saving view");
+      setSnackbarSeverity("error");
+      setSnackbarOpen(true);
+    }
   };
 
+  // Update an existing view
+  const handleUpdateView = async () => {
+    if (!selectedView || !createdWidgets.length) {
+      setSnackbarMessage("Please select a view to update");
+      setSnackbarSeverity("warning");
+      setSnackbarOpen(true);
+      return;
+    }
+
+    const viewToUpdate = savedViews.find((v) => v._id === selectedView);
+    if (!viewToUpdate) return;
+
+    const updatedViewData = {
+      terminalIds: terminals,
+      terminalNames: terminals.map(
+        (tId) =>
+          terminalOptions.find((t) => t.TerminalId === tId)?.TerminalName || ""
+      ),
+    };
+
+    try {
+      const response = await axios.put(
+        `${API_BASE_URL}/${viewToUpdate._id}`,
+        updatedViewData
+      );
+      setSavedViews((prev) =>
+        prev.map((v) => (v._id === viewToUpdate._id ? response.data.data : v))
+      );
+      setSnackbarMessage("View updated successfully!");
+      setSnackbarSeverity("success");
+      setSnackbarOpen(true);
+    } catch (error) {
+      console.error("Error updating view:", error);
+      setSnackbarMessage("Error updating view");
+      setSnackbarSeverity("error");
+      setSnackbarOpen(true);
+    }
+  };
+
+  // Load a selected view
   const handleViewChange = (event) => {
-    const viewName = event.target.value;
-    setSelectedView(viewName);
-    if (viewName) {
-      const savedView = savedViews.find((v) => v.name === viewName);
-      setCreatedWidgets(savedView.widgets);
+    const viewId = event.target.value;
+    setSelectedView(viewId);
+    if (viewId) {
+      const savedView = savedViews.find((v) => v._id === viewId);
+      const newWidgets = savedView.terminalIds.map((terminalId, index) => {
+        const terminalName =
+          savedView.terminalNames[index] ||
+          terminalOptions.find((t) => t.TerminalId === terminalId)
+            ?.TerminalName ||
+          `Terminal ${terminalId}`;
+        return {
+          plantId: savedView.plantId,
+          measurandId: savedView.measurandId,
+          terminalId: terminalId,
+          displayName: terminalName,
+          widgetType: showGraph ? "graph" : "number",
+          decimalPlaces: 2,
+          graphType: showGraph ? "area" : null,
+          xAxisConfiguration: showGraph ? "time:timestamp" : null,
+          refreshInterval: 10000,
+          position: {
+            x: (index % 3) * 4,
+            y: Math.floor(index / 3) * 4,
+            width: showGraph ? 6 : 4,
+            height: showGraph ? 6 : 4,
+          },
+          i: `${terminalName}${showGraph ? "-graph" : ""}`,
+          value: null,
+          timestamp: null,
+        };
+      });
+
+      setCreatedWidgets(newWidgets);
       setLayout(
-        savedView.widgets.map((w) => ({
+        newWidgets.map((w) => ({
           i: w.i,
           x: w.position.x,
           y: w.position.y,
           w: w.position.width,
           h: w.position.height,
-          minW: w.widgetType === "graph" ? 4 : 2,
-          minH: w.widgetType === "graph" ? 4 : 2,
+          minW: showGraph ? 4 : 2,
+          minH: showGraph ? 4 : 2,
           maxW: 12,
           maxH: 8,
         }))
       );
-      setTerminals(savedView.terminals);
-      setShowGraph(savedView.widgets.some((w) => w.widgetType === "graph"));
-      setPlant(savedView.plant);
-      setScript(savedView.script);
+      setTerminals(savedView.terminalIds);
+      setPlant(savedView.plantId);
+      setMeasurand(savedView.measurandId);
       setSelectionInfo({
-        plantName: savedView.plant,
-        scriptName: savedView.script,
-        terminalNames: savedView.terminals,
-        viewType: savedView.widgets.some((w) => w.widgetType === "graph")
-          ? "Graph"
-          : "Number",
+        plantId: savedView.plantId,
+        measurandId: savedView.measurandId,
+        terminalIds: savedView.terminalIds,
+        viewType: showGraph ? "Graph" : "Number",
         timestamp: new Date().toLocaleString(),
       });
       setShowWidgets(true);
@@ -250,26 +365,37 @@ const CDDMeasurand = () => {
     }
   };
 
+  // Delete a view
+  const handleDeleteView = async () => {
+    if (!selectedView) return;
+
+    try {
+      await axios.delete(`${API_BASE_URL}/${selectedView}`);
+      setSavedViews((prev) => prev.filter((v) => v._id !== selectedView));
+      setSelectedView("");
+      setShowWidgets(false);
+      setCreatedWidgets([]);
+      setSelectionInfo(null);
+      setSnackbarMessage("View deleted successfully");
+      setSnackbarSeverity("success");
+      setSnackbarOpen(true);
+      setDeleteDialogOpen(false);
+    } catch (error) {
+      console.error("Error deleting view:", error);
+      setSnackbarMessage("Error deleting view");
+      setSnackbarSeverity("error");
+      setSnackbarOpen(true);
+    }
+  };
+
   const handleDeleteClick = () => {
     if (!selectedView) return;
     setDeleteDialogOpen(true);
   };
 
-  const handleDeleteView = () => {
-    setSavedViews((prev) => prev.filter((v) => v.name !== selectedView));
-    setSelectedView("");
-    setShowWidgets(false);
-    setCreatedWidgets([]);
-    setSelectionInfo(null);
-    setSnackbarMessage("View deleted successfully");
-    setSnackbarSeverity("error");
-    setSnackbarOpen(true);
-    setDeleteDialogOpen(false);
-  };
-
   const handleAddWidget = () => {
-    if (!plant || !script) {
-      setSnackbarMessage("Please select a plant and script first");
+    if (!plant || !measurand) {
+      setSnackbarMessage("Please select a plant and measurand first");
       setSnackbarSeverity("warning");
       setSnackbarOpen(true);
       return;
@@ -285,11 +411,12 @@ const CDDMeasurand = () => {
       return;
     }
 
+    setLoading(true);
     const newWidget = {
-      plantName: plant,
-      scriptName: script,
-      terminalName: widgetData.terminalName,
-      displayName: widgetData.terminalName,
+      plantId: plant,
+      measurandId: measurand,
+      terminalId: widgetData.terminalName,
+      displayName: widgetData.widgetName,
       widgetType: widgetData.isGraph ? "graph" : "number",
       decimalPlaces: parseInt(widgetData.decimalPlaces),
       graphType: widgetData.isGraph ? widgetData.graphType : null,
@@ -304,8 +431,8 @@ const CDDMeasurand = () => {
         height: widgetData.isGraph ? 6 : 4,
       },
       i: `${widgetData.terminalName}${widgetData.isGraph ? "-graph" : ""}`,
-      value: staticWidgetData[widgetData.terminalName]?.value || null,
-      timestamp: staticWidgetData[widgetData.terminalName]?.timestamp || null,
+      value: null,
+      timestamp: null,
     };
 
     setCreatedWidgets((prev) => [...prev, newWidget]);
@@ -328,6 +455,7 @@ const CDDMeasurand = () => {
     setSnackbarSeverity("success");
     setSnackbarOpen(true);
     setWidgetDialogOpen(false);
+    setLoading(false);
   };
 
   const handleOpenProperties = () => {
@@ -352,53 +480,59 @@ const CDDMeasurand = () => {
   const TransitionSlide = (props) => <Slide {...props} direction="left" />;
 
   return (
-    <Box sx={{ width: "100%", p: 2 }}>
-      <Paper sx={{ p: 2 }}>
-        <Box sx={{ display: "flex", gap: 2 }}>
-          <FormControl size="small" sx={{ minWidth: 200 }}>
+    <Box>
+      <Paper>
+        <Box sx={{ display: "flex", gap: 2, p: 2 }}>
+          <FormControl size="small" sx={{ minWidth: 200 }} disabled={loading}>
             <InputLabel>Plant</InputLabel>
             <Select
               value={plant}
               label="Plant"
               onChange={(e) => {
                 setPlant(e.target.value);
-                setScript("");
+                setMeasurand("");
                 setTerminals([]);
               }}
             >
-              {plantOptions.map((p) => (
-                <MenuItem key={p} value={p}>
-                  {p}
+              {plants.map((p) => (
+                <MenuItem key={p.PlantId} value={p.PlantId}>
+                  {p.PlantName}
                 </MenuItem>
               ))}
             </Select>
           </FormControl>
-          <FormControl size="small" sx={{ minWidth: 200 }}>
-            <InputLabel>Script</InputLabel>
+          <FormControl
+            size="small"
+            sx={{ minWidth: 200 }}
+            disabled={!plant || loading}
+          >
+            <InputLabel>Measurand</InputLabel>
             <Select
-              value={script}
-              label="Script"
+              value={measurand}
+              label="Measurand"
               onChange={(e) => {
-                setScript(e.target.value);
+                setMeasurand(e.target.value);
                 setTerminals([]);
               }}
-              disabled={!plant}
             >
-              {(scriptOptions[plant] || []).map((s) => (
-                <MenuItem key={s} value={s}>
-                  {s}
+              {measurands.map((m) => (
+                <MenuItem key={m.MeasurandId} value={m.MeasurandId}>
+                  {m.MeasurandName}
                 </MenuItem>
               ))}
             </Select>
           </FormControl>
-          <FormControl size="small" sx={{ minWidth: 200 }}>
+          <FormControl
+            size="small"
+            sx={{ minWidth: 200 }}
+            disabled={!measurand || loading}
+          >
             <InputLabel>Terminals</InputLabel>
             <Select
               multiple
               value={terminals}
               label="Terminals"
               onChange={handleTerminalChange}
-              disabled={!script}
               renderValue={(selected) => (
                 <Box
                   sx={{
@@ -416,10 +550,10 @@ const CDDMeasurand = () => {
                 <Checkbox checked={allSelected} />
                 <ListItemText primary="Select All" />
               </MenuItem>
-              {(terminalOptions[plant]?.[script] || []).map((t) => (
-                <MenuItem key={t} value={t}>
-                  <Checkbox checked={terminals.includes(t)} />
-                  <ListItemText primary={t} />
+              {terminalOptions.map((t) => (
+                <MenuItem key={t.TerminalId} value={t.TerminalId}>
+                  <Checkbox checked={terminals.includes(t.TerminalId)} />
+                  <ListItemText primary={t.TerminalName} />
                 </MenuItem>
               ))}
             </Select>
@@ -438,6 +572,7 @@ const CDDMeasurand = () => {
             variant="contained"
             onClick={handleGoClick}
             sx={{ flexShrink: 0 }}
+            disabled={loading}
           >
             Go
           </Button>
@@ -445,19 +580,31 @@ const CDDMeasurand = () => {
             variant="contained"
             onClick={handleAddWidget}
             sx={{ flexShrink: 0, ml: 1 }}
+            disabled={loading}
           >
             Add Widget
           </Button>
           {showWidgets && (
-            <Button
-              variant="outlined"
-              onClick={handleSaveView}
-              sx={{ flexShrink: 0, ml: 1 }}
-            >
-              Save View
-            </Button>
+            <>
+              <Button
+                variant="outlined"
+                onClick={handleSaveView}
+                sx={{ flexShrink: 0, ml: 1 }}
+                disabled={loading}
+              >
+                Save View
+              </Button>
+              <Button
+                variant="outlined"
+                onClick={handleUpdateView}
+                sx={{ flexShrink: 0, ml: 1 }}
+                disabled={loading || !selectedView}
+              >
+                Update View
+              </Button>
+            </>
           )}
-          <FormControl size="small" sx={{ minWidth: 200 }}>
+          <FormControl size="small" sx={{ minWidth: 200 }} disabled={loading}>
             <InputLabel>Saved Views</InputLabel>
             <Select
               value={selectedView}
@@ -468,8 +615,9 @@ const CDDMeasurand = () => {
                 <em>None</em>
               </MenuItem>
               {savedViews.map((view) => (
-                <MenuItem key={view.name} value={view.name}>
-                  {view.name}
+                <MenuItem key={view._id} value={view._id}>
+                  {view.plantName} - {view.measurandName} (
+                  {view.terminalIds.length} terminals)
                 </MenuItem>
               ))}
             </Select>
@@ -480,6 +628,7 @@ const CDDMeasurand = () => {
                 color="error"
                 onClick={handleDeleteClick}
                 sx={{ ml: 1, flexShrink: 0 }}
+                disabled={loading}
               >
                 <DeleteIcon />
               </IconButton>
@@ -504,15 +653,22 @@ const CDDMeasurand = () => {
                 Plant:
               </Typography>
               <Typography variant="body1" sx={{ ml: 1 }}>
-                {selectionInfo.plantName}
+                {
+                  plants.find((p) => p.PlantId === selectionInfo.plantId)
+                    ?.PlantName
+                }
               </Typography>
             </Box>
             <Box sx={{ display: "flex", alignItems: "center" }}>
               <Typography variant="subtitle1" sx={{ fontWeight: "medium" }}>
-                Script:
+                Measurand:
               </Typography>
               <Typography variant="body1" sx={{ ml: 1 }}>
-                {selectionInfo.scriptName}
+                {
+                  measurands.find(
+                    (m) => m.MeasurandId === selectionInfo.measurandId
+                  )?.MeasurandName
+                }
               </Typography>
             </Box>
             <Box sx={{ display: "flex", alignItems: "center" }}>
@@ -528,11 +684,19 @@ const CDDMeasurand = () => {
                 Terminals:
               </Typography>
               <Chip
-                label={`${selectionInfo.terminalNames.length} selected`}
+                label={`${selectionInfo.terminalIds.length} selected`}
                 size="small"
                 sx={{ ml: 1 }}
               />
-              <Tooltip title={selectionInfo.terminalNames.join(", ")}>
+              <Tooltip
+                title={selectionInfo.terminalIds
+                  .map(
+                    (id) =>
+                      terminalOptions.find((t) => t.TerminalId === id)
+                        ?.TerminalName
+                  )
+                  .join(", ")}
+              >
                 <IconButton size="small">
                   <InfoIcon fontSize="small" />
                 </IconButton>
@@ -546,7 +710,7 @@ const CDDMeasurand = () => {
       )}
 
       {showWidgets ? (
-        <Paper elevation={3} sx={{ p: 2 }}>
+        <Paper elevation={3}>
           <GridLayout
             className="layout"
             layout={layout}
@@ -562,47 +726,57 @@ const CDDMeasurand = () => {
           >
             {layout.map((item) => {
               const isGraph = item.i.includes("-graph");
-              const title = item.i.split("-")[0];
               const widget = createdWidgets.find((w) => w.i === item.i);
+              const fetchValue = async () => {
+                const response = await axios.get(
+                  `${API_BASE_URL}/measurements/${widget.plantId}/${widget.measurandId}/${widget.terminalId}`
+                );
+                const data = response.data.data[0]?.TerminalDetails[0] || {};
+                return {
+                  value: data.MeasurandValue ?? "N/A",
+                  timestamp: data.TimeStamp ?? null,
+                };
+              };
               return (
                 <div key={item.i}>
                   {isGraph ? (
                     <GraphWidget
-                      title={title}
+                      title={widget.displayName}
                       widgetId={item.i}
-                      terminalInfo={`${plant} - ${script}`}
-                      fetchValue={() =>
-                        Promise.resolve(staticGraphData[title] || [])
-                      }
+                      terminalInfo={`${
+                        plants.find((p) => p.PlantId === plant)?.PlantName
+                      } - ${
+                        measurands.find((m) => m.MeasurandId === measurand)
+                          ?.MeasurandName
+                      }`}
+                      fetchValue={() => Promise.resolve([])} // Replace with actual graph data API if needed
                       onDelete={(id) => {
                         setLayout((prev) => prev.filter((l) => l.i !== id));
                         setCreatedWidgets((prev) =>
                           prev.filter((w) => w.i !== id)
                         );
                       }}
+                      xAxisConfiguration={widget.xAxisConfiguration}
                     />
                   ) : (
                     <NumberWidget
-                      title={title}
+                      title={widget.displayName}
                       widgetId={item.i}
-                      terminalInfo={`${plant} - ${script}`}
-                      fetchValue={() =>
-                        Promise.resolve(
-                          staticWidgetData[title] || {
-                            value: null,
-                            timestamp: null,
-                          }
-                        )
-                      }
-                      value={widget?.value}
-                      timestamp={widget?.timestamp}
+                      terminalInfo={`${
+                        plants.find((p) => p.PlantId === plant)?.PlantName
+                      } - ${
+                        measurands.find((m) => m.MeasurandId === measurand)
+                          ?.MeasurandName
+                      }`}
+                      fetchValue={fetchValue}
+                      decimalPlaces={widget.decimalPlaces}
+                      refreshInterval={widget.refreshInterval}
                       onDelete={(id) => {
                         setLayout((prev) => prev.filter((l) => l.i !== id));
                         setCreatedWidgets((prev) =>
                           prev.filter((w) => w.i !== id)
                         );
                       }}
-                      {...(widget?.properties || {})}
                     />
                   )}
                 </div>
@@ -652,7 +826,7 @@ const CDDMeasurand = () => {
         onClose={() => setDeleteDialogOpen(false)}
         onConfirm={handleDeleteView}
         title="Confirm View Deletion"
-        message={`Are you sure you want to delete the view "${selectedView}"? This action cannot be undone.`}
+        message={`Are you sure you want to delete the selected view? This action cannot be undone.`}
       />
 
       <Snackbar
