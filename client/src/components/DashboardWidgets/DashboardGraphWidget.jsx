@@ -1,5 +1,3 @@
-"use client";
-
 import React, { useEffect, useState, useRef } from "react";
 import axios from "axios";
 import {
@@ -21,6 +19,9 @@ import {
   IconButton,
   useTheme,
   Drawer,
+  FormControl,
+  InputLabel,
+  Select,
   MenuItem,
   Button,
   Menu,
@@ -237,16 +238,16 @@ const DashboardGraphWidget = ({
   const [thresholds, setThresholds] = useState(
     data.thresholds || { percentage: null }
   );
+  const [tempThresholds, setTempThresholds] = useState({ percentage: "" });
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [availableMeasurands, setAvailableMeasurands] = useState([]);
-  const [measurandColors, setMeasurandColors] = useState({}); // Track color selections
+  const [measurandColors, setMeasurandColors] = useState({});
   const [terminalDetails, setTerminalDetails] = useState({
     plantId: null,
     terminalId: null,
   });
   const [percentageDialogOpen, setPercentageDialogOpen] = useState(false);
-  const [percentageInput, setPercentageInput] = useState("");
   const chartInstanceRef = useRef(null);
   const widgetRef = useRef(null);
   const [anchorEl, setAnchorEl] = useState(null);
@@ -256,6 +257,7 @@ const DashboardGraphWidget = ({
   const [snackbarSeverity, setSnackbarSeverity] = useState("success");
   const settings = data.settings || {};
 
+  // Save configuration to backend
   useEffect(() => {
     const saveConfiguration = async () => {
       try {
@@ -273,11 +275,12 @@ const DashboardGraphWidget = ({
         setSnackbarOpen(true);
       }
     };
-    if (selectedMeasurands.length > 0 || thresholds.percentage) {
+    if (selectedMeasurands.length > 0 || thresholds.percentage !== null) {
       saveConfiguration();
     }
   }, [selectedMeasurands, thresholds, data.id, data.dashboardName]);
 
+  // Fetch terminal details
   const fetchTerminalDetails = async (terminalName) => {
     try {
       if (!terminalName)
@@ -306,6 +309,7 @@ const DashboardGraphWidget = ({
     }
   };
 
+  // Fetch available measurands
   const fetchAvailableMeasurands = async (plantId, terminalId) => {
     try {
       if (!plantId || !terminalId)
@@ -318,9 +322,8 @@ const DashboardGraphWidget = ({
         MeasurandName: item.measurandName,
       }));
       setAvailableMeasurands(measurands);
-      // Initialize default colors for measurands
       const initialColors = measurands.reduce((acc, measurand) => {
-        acc[measurand.MeasurandId] = "#000000"; // Default color
+        acc[measurand.MeasurandId] = "#000000";
         return acc;
       }, {});
       setMeasurandColors(initialColors);
@@ -352,6 +355,7 @@ const DashboardGraphWidget = ({
     resolveTerminalDetails();
   }, [data.terminal, data.plantId, data.terminalId]);
 
+  // Fetch graph data
   const fetchGraphData = async (measurandId) => {
     try {
       const { terminalId } = terminalDetails;
@@ -414,21 +418,27 @@ const DashboardGraphWidget = ({
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
   }, [isFullscreen]);
 
-  const calculateThresholdLines = () => {
-    if (!thresholds.percentage || !graphData[selectedMeasurands[0]?.id])
-      return {};
-    const primaryData = graphData[selectedMeasurands[0].id] || [];
-    const values = primaryData.map((d) => d.value).filter((v) => !isNaN(v));
-    if (values.length === 0) return {};
-    const avg = values.reduce((sum, v) => sum + v, 0) / values.length;
-    const percentage = parseFloat(thresholds.percentage) / 100;
-    const minLine = avg * (1 - percentage);
-    const maxLine = avg * (1 + percentage);
-    return { minLine, maxLine };
+  // Calculate thresholds for each data point
+  const calculateThresholds = (measurandData, percentage) => {
+    if (!measurandData || measurandData.length === 0 || percentage === null)
+      return { upperThresholds: [], lowerThresholds: [] };
+
+    return measurandData.reduce(
+      (acc, item) => {
+        const value = item.value;
+        const bandwidthValue = value * (percentage / 100);
+        const upperThreshold = (value + bandwidthValue).toFixed(2);
+        const lowerThreshold = (value - bandwidthValue).toFixed(2);
+
+        acc.upperThresholds.push(parseFloat(upperThreshold));
+        acc.lowerThresholds.push(parseFloat(lowerThreshold));
+        return acc;
+      },
+      { upperThresholds: [], lowerThresholds: [] }
+    );
   };
 
-  const { minLine, maxLine } = calculateThresholdLines();
-
+  // Prepare chart data with threshold lines
   const chartData = {
     labels:
       selectedMeasurands.length > 0 && graphData[selectedMeasurands[0].id]
@@ -458,25 +468,27 @@ const DashboardGraphWidget = ({
           borderWidth: 2,
         };
       }),
-      ...(minLine !== undefined
+      ...(thresholds.percentage !== null && selectedMeasurands[0]?.id
         ? [
             {
-              label: "Percentage Min",
-              data: graphData[selectedMeasurands[0]?.id]?.map(() => minLine),
-              borderColor: "rgba(255, 165, 0, 0.8)",
+              label: "Upper Threshold",
+              data: calculateThresholds(
+                graphData[selectedMeasurands[0].id],
+                thresholds.percentage
+              ).upperThresholds,
+              borderColor: "darkred",
               borderDash: [5, 5],
               fill: false,
               pointRadius: 0,
               borderWidth: 2,
             },
-          ]
-        : []),
-      ...(maxLine !== undefined
-        ? [
             {
-              label: "Percentage Max",
-              data: graphData[selectedMeasurands[0]?.id]?.map(() => maxLine),
-              borderColor: "rgba(0, 0, 255, 0.8)",
+              label: "Lower Threshold",
+              data: calculateThresholds(
+                graphData[selectedMeasurands[0].id],
+                thresholds.percentage
+              ).lowerThresholds,
+              borderColor: "darkgreen",
               borderDash: [5, 5],
               fill: false,
               pointRadius: 0,
@@ -529,7 +541,7 @@ const DashboardGraphWidget = ({
     },
     plugins: {
       legend: {
-        display: false, // Hide legend (measurand names)
+        display: false,
       },
       tooltip: {
         enabled: true,
@@ -618,7 +630,6 @@ const DashboardGraphWidget = ({
       ...prev,
       [measurandId]: color,
     }));
-    // Update color for already selected measurand
     const newMeasurands = selectedMeasurands.map((m) =>
       m.id === measurandId
         ? {
@@ -636,14 +647,17 @@ const DashboardGraphWidget = ({
     setSelectedMeasurands(newMeasurands);
   };
 
-  const handlePercentageDialogOpen = () => setPercentageDialogOpen(true);
+  const handlePercentageDialogOpen = () => {
+    setTempThresholds({ percentage: thresholds.percentage || "" });
+    setPercentageDialogOpen(true);
+  };
+
   const handlePercentageDialogClose = () => {
     setPercentageDialogOpen(false);
-    setPercentageInput("");
   };
 
   const handlePercentageSave = () => {
-    const percentage = parseFloat(percentageInput);
+    const percentage = parseFloat(tempThresholds.percentage);
     if (isNaN(percentage) || percentage < 0 || percentage > 100) {
       setSnackbarMessage("Please enter a valid percentage (0-100)");
       setSnackbarSeverity("error");
@@ -929,11 +943,12 @@ const DashboardGraphWidget = ({
             fullWidth
             label="Percentage (%)"
             type="number"
-            value={percentageInput}
-            onChange={(e) => setPercentageInput(e.target.value)}
+            value={tempThresholds.percentage}
+            onChange={(e) => setTempThresholds({ percentage: e.target.value })}
             variant="outlined"
             sx={{ mt: 2 }}
-            helperText="Enter a percentage to calculate min/max lines based on the primary measurand's average"
+            helperText="Enter a percentage to calculate min/max lines based on each data point"
+            InputProps={{ endAdornment: <span>%</span> }}
           />
         </DialogContent>
         <DialogActions>
