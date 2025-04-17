@@ -10,9 +10,9 @@ const WidgetSchema = new mongoose.Schema({
   plant: String,
   terminal: String,
   measurement: String,
-  plantId: { type: String }, // Add plantId
-  terminalId: { type: String }, // Add terminalId
-  measurandId: { type: String }, // Add measurandId
+  plantId: { type: String },
+  terminalId: { type: String },
+  measurandId: { type: String },
   name: String,
   unit: String,
   decimals: Number,
@@ -36,6 +36,17 @@ const WidgetSchema = new mongoose.Schema({
       color: { type: String },
     },
   ],
+  selectedMeasurands: [
+    {
+      id: { type: String },
+      name: { type: String },
+    },
+  ],
+  thresholds: {
+    min: { type: Number, default: null },
+    max: { type: Number, default: null },
+    percentage: { type: Number, default: null },
+  },
   layout: {
     i: { type: String, required: true },
     x: { type: Number, required: true },

@@ -1,31 +1,61 @@
-// models/MeasurandView.js
 const mongoose = require("mongoose");
-const Schema = mongoose.Schema;
 
-const MeasurandViewSchema = new Schema(
+const measurandViewSchema = new mongoose.Schema(
   {
-    profile: { type: String, default: "custom" },
-    measurandId: { type: Number, required: true },
-    terminalIds: [{ type: Number, required: true }],
-    measurandName: { type: String },
-    terminalNames: [{ type: String }],
-    plantId: { type: Number, required: true },
-    plantName: { type: String },
-    createdAt: { type: Date, default: Date.now },
-    updatedAt: { type: Date, default: Date.now },
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    description: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    measurandId: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    widgets: [
+      {
+        i: { type: String, required: true },
+        plantId: { type: String },
+        plantName: { type: String },
+        measurandId: { type: String },
+        measurandName: { type: String },
+        terminalId: { type: String },
+        terminalName: { type: String },
+        displayName: { type: String },
+        unit: { type: String },
+        widgetType: { type: String, enum: ["number", "graph"] },
+        decimalPlaces: { type: Number },
+        graphType: { type: String },
+        xAxisConfiguration: { type: String },
+        refreshInterval: { type: Number },
+        properties: { type: mongoose.Schema.Types.Mixed },
+        position: {
+          x: { type: Number, required: true },
+          y: { type: Number, required: true },
+          width: { type: Number, required: true },
+          height: { type: Number, required: true },
+        },
+      },
+    ],
+    plant: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    terminal: {
+      type: String,
+      required: true,
+      trim: true,
+    },
   },
   {
-    collection: "MeasurandViews",
     timestamps: true,
   }
 );
 
-MeasurandViewSchema.index({ measurandId: 1 });
-MeasurandViewSchema.index({ terminalIds: 1 });
-MeasurandViewSchema.index({ plantId: 1 });
-
-const MeasurandView =
-  mongoose.models.MeasurandView ||
-  mongoose.model("MeasurandView", MeasurandViewSchema);
-
-module.exports = MeasurandView;
+module.exports = mongoose.model("MeasurandView", measurandViewSchema);

@@ -1,8 +1,6 @@
-const ESPlant = require("../models/ESPlant");
-const NodeCache = require("node-cache");
 const MeasurandView = require("../models/MeasurandView");
 const ESPlantMeasurandView = require("../models/ESPlantMeasurandView");
-
+const NodeCache = require("node-cache");
 const log = {
   info: (msg) => console.log(`[INFO] ${new Date().toISOString()} - ${msg}`),
   error: (msg) => console.error(`[ERROR] ${new Date().toISOString()} - ${msg}`),
@@ -25,7 +23,250 @@ const withRetry = async (fn, retries = 3, delay = 1000) => {
   }
 };
 
-// 1. Get All Plants from ESPlantMeasurandView
+// -------------------- 1. Save a new measurand view --------------------
+exports.saveMeasurandView = async (req, res) => {
+  try {
+    const { name, description, measurandId, widgets, plant, terminal } =
+      req.body;
+
+    if (
+      !name ||
+      !measurandId ||
+      !plant ||
+      !terminal ||
+      !widgets ||
+      !Array.isArray(widgets)
+    ) {
+      return res.status(400).json({ message: "Missing required fields" });
+    }
+
+    // Validate widget positions
+    const invalidWidgets = widgets.filter(
+      (widget) =>
+        !widget.position ||
+        typeof widget.position.x !== "number" ||
+        typeof widget.position.y !== "number" ||
+        typeof widget.position.width !== "number" ||
+        typeof widget.position.height !== "number"
+    );
+
+    if (invalidWidgets.length > 0) {
+      log.error("Invalid widgets:", invalidWidgets);
+      return res.status(400).json({ message: "Invalid widget position data" });
+    }
+
+    const existingView = await MeasurandView.findOne({
+      name: { $regex: new RegExp(`^${name}$`, "i") },
+    });
+    if (existingView) {
+      return res.status(400).json({ message: `View "${name}" already exists` });
+    }
+
+    const newView = new MeasurandView({
+      name,
+      description: description || "",
+      measurandId,
+      widgets: widgets.map((widget) => ({
+        ...widget,
+        position: {
+          x: widget.position.x,
+          y: widget.position.y,
+          width: widget.position.width,
+          height: widget.position.height,
+        },
+      })),
+      plant,
+      terminal,
+    });
+
+    const savedView = await newView.save();
+    log.info(`Saved measurand view: ${savedView._id}`);
+    res.status(201).json(savedView);
+  } catch (error) {
+    log.error(`Error saving measurand view: ${error.message}`);
+    res
+      .status(500)
+      .json({ message: "Error saving measurand view", error: error.message });
+  }
+};
+
+// -------------------- 2. Update an existing measurand view --------------------
+exports.updateMeasurandView = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, description, measurandId, widgets, plant, terminal } =
+      req.body;
+
+    if (
+      !name ||
+      !measurandId ||
+      !plant ||
+      !terminal ||
+      !widgets ||
+      !Array.isArray(widgets)
+    ) {
+      return res.status(400).json({ message: "Missing required fields" });
+    }
+
+    const invalidWidgets = widgets.filter(
+      (widget) =>
+        !widget.position ||
+        typeof widget.position.x !== "number" ||
+        typeof widget.position.y !== "number" ||
+        typeof widget.position.width !== "number" ||
+        typeof widget.position.height !== "number"
+    );
+
+    if (invalidWidgets.length > 0) {
+      log.error("Invalid widgets:", invalidWidgets);
+      return res.status(400).json({ message: "Invalid widget position data" });
+    }
+
+    const view = await MeasurandView.findById(id);
+    if (!view) {
+      return res.status(404).json({ message: "Measurand view not found" });
+    }
+
+    const existingView = await MeasurandView.findOne({
+      name: { $regex: new RegExp(`^${name}$`, "i") },
+      _id: { $ne: id },
+    });
+    if (existingView) {
+      return res.status(400).json({ message: `View "${name}" already exists` });
+    }
+
+    const updatedView = await MeasurandView.findByIdAndUpdate(
+      id,
+      {
+        name,
+        description: description || "",
+        measurandId,
+        widgets: widgets.map((widget) => ({
+          ...widget,
+          position: {
+            x: widget.position.x,
+            y: widget.position.y,
+            width: widget.position.width,
+            height: widget.position.height,
+          },
+        })),
+        plant,
+        terminal,
+      },
+      { new: true, runValidators: true }
+    ).lean();
+
+    if (!updatedView) {
+      return res.status(404).json({ message: "Measurand view not found" });
+    }
+
+    log.info(`Updated measurand view: ${id}`);
+    res.json(updatedView);
+  } catch (error) {
+    log.error(`Error updating measurand view: ${error.message}`);
+    res
+      .status(500)
+      .json({ message: "Error updating measurand view", error: error.message });
+  }
+};
+
+// -------------------- 3. Get all saved measurand views --------------------
+exports.getSavedMeasurandViews = async (req, res) => {
+  try {
+    const views = await MeasurandView.find().lean();
+    res.json(views);
+  } catch (error) {
+    log.error(`Error retrieving measurand views: ${error.message}`);
+    res
+      .status(500)
+      .json({
+        message: "Error retrieving measurand views",
+        error: error.message,
+      });
+  }
+};
+
+// -------------------- 4. Get a specific saved measurand view by ID --------------------
+exports.getSavedMeasurandViewById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const view = await MeasurandView.findById(id).lean();
+    if (!view) {
+      return res.status(404).json({ message: "Measurand view not found" });
+    }
+    res.json(view);
+  } catch (error) {
+    log.error(`Error retrieving measurand view: ${error.message}`);
+    res
+      .status(500)
+      .json({
+        message: "Error retrieving measurand view",
+        error: error.message,
+      });
+  }
+};
+
+// -------------------- 5. Delete a saved measurand view by ID --------------------
+exports.deleteSavedMeasurandView = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deletedView = await MeasurandView.findByIdAndDelete(id);
+    if (!deletedView) {
+      return res.status(404).json({ message: "Measurand view not found" });
+    }
+    log.info(`Deleted measurand view: ${id}`);
+    res.json({ message: "Measurand view deleted successfully" });
+  } catch (error) {
+    log.error(`Error deleting measurand view: ${error.message}`);
+    res
+      .status(500)
+      .json({ message: "Error deleting measurand view", error: error.message });
+  }
+};
+
+// -------------------- 6. Update widget properties --------------------
+exports.updateWidgetProperties = async (req, res) => {
+  try {
+    const { viewId, widgetId } = req.params;
+    const properties = req.body;
+
+    if (
+      !viewId ||
+      !widgetId ||
+      !properties ||
+      Object.keys(properties).length === 0
+    ) {
+      return res.status(400).json({
+        message: "Missing required fields: viewId, widgetId, or properties",
+      });
+    }
+
+    const updatedView = await MeasurandView.findOneAndUpdate(
+      { _id: viewId, "widgets.i": widgetId },
+      { $set: { "widgets.$.properties": properties } },
+      { new: true }
+    ).lean();
+
+    if (!updatedView) {
+      return res
+        .status(404)
+        .json({ message: "Measurand view or widget not found" });
+    }
+
+    log.info(
+      `Updated widget properties for view: ${viewId}, widget: ${widgetId}`
+    );
+    res.json(updatedView);
+  } catch (error) {
+    log.error(`Error updating widget properties: ${error.message}`);
+    res.status(500).json({
+      message: "Error updating widget properties",
+      error: error.message,
+    });
+  }
+};
+
+// -------------------- 7. Get All Plants from ESPlantMeasurandView --------------------
 exports.getAllPlants = async (req, res) => {
   try {
     const plants = await ESPlantMeasurandView.distinct("PlantId").lean();
@@ -51,11 +292,12 @@ exports.getAllPlants = async (req, res) => {
 
     res.json(uniquePlants);
   } catch (error) {
+    log.error(`Error fetching plants: ${error.message}`);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
-// 2. Get All Measurands by Plant ID from ESPlantMeasurandView
+// -------------------- 8. Get All Measurands by Plant ID --------------------
 exports.getAllMeasurandsByPlantId = async (req, res) => {
   try {
     const { plantId } = req.params;
@@ -82,11 +324,12 @@ exports.getAllMeasurandsByPlantId = async (req, res) => {
 
     res.json(uniqueMeasurands);
   } catch (error) {
+    log.error(`Error fetching measurands: ${error.message}`);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
-// 3. Get All Terminals by Plant ID and Measurand ID from ESPlantMeasurandView
+// -------------------- 9. Get All Terminals by Plant ID and Measurand ID --------------------
 exports.getAllTerminalsByPlantAndMeasurand = async (req, res) => {
   try {
     const { plantId, measurandId } = req.params;
@@ -125,11 +368,12 @@ exports.getAllTerminalsByPlantAndMeasurand = async (req, res) => {
 
     res.json(uniqueTerminals);
   } catch (error) {
+    log.error(`Error fetching terminals: ${error.message}`);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
-// 4. Get Measurand View Measurement Data
+// -------------------- 10. Get Measurand View Measurement Data --------------------
 exports.getMeasurandViewMeasurementData = async (req, res) => {
   try {
     const { plantId, measurandId, terminalId } = req.params;
@@ -148,11 +392,7 @@ exports.getMeasurandViewMeasurementData = async (req, res) => {
     const cachedData = cache.get(cacheKey);
     if (cachedData) {
       log.info(`Cache hit for measurand view data: ${cacheKey}`);
-      return res.status(200).json({
-        success: true,
-        message: "Measurand view data retrieved from cache",
-        data: cachedData,
-      });
+      return res.json(cachedData);
     }
 
     const data = await withRetry(async () => {
@@ -161,7 +401,6 @@ exports.getMeasurandViewMeasurementData = async (req, res) => {
 
     if (!data.length) {
       return res.status(404).json({
-        success: false,
         message:
           "No measurement data found for this measurand view and terminal",
       });
@@ -190,7 +429,6 @@ exports.getMeasurandViewMeasurementData = async (req, res) => {
 
     if (!filteredData.length) {
       return res.status(404).json({
-        success: false,
         message: "No measurement data found for this terminal",
       });
     }
@@ -198,190 +436,11 @@ exports.getMeasurandViewMeasurementData = async (req, res) => {
     cache.set(cacheKey, filteredData);
     log.info(`Cache set for measurand view data: ${cacheKey}`);
 
-    res.status(200).json({
-      success: true,
-      message: "Measurand view data retrieved successfully",
-      data: filteredData,
-    });
+    res.json(filteredData);
   } catch (error) {
     log.error(`Error fetching measurand view data: ${error.message}`);
     res.status(500).json({
-      success: false,
       message: "Failed to fetch measurand view data",
-      error: error.message,
-    });
-  }
-};
-
-// -------------------- 5. Get All Measurand Views --------------------
-exports.getMeasurandViews = async (req, res) => {
-  try {
-    const views = await withRetry(async () => {
-      return await MeasurandView.find().lean().exec();
-    });
-
-    if (!views || views.length === 0) {
-      log.info("No Measurand views found.");
-      return res.status(200).json({
-        success: true,
-        message: "No Measurand views found",
-        data: [],
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      message: "Measurand views retrieved successfully",
-      data: views,
-      total: views.length,
-    });
-  } catch (error) {
-    log.error(`Error fetching Measurand views: ${error.message}`);
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch Measurand views",
-      error: error.message,
-    });
-  }
-};
-
-// -------------------- 6. Create Measurand View --------------------
-exports.createMeasurandView = async (req, res) => {
-  try {
-    const {
-      plantId,
-      measurandId,
-      terminalIds,
-      plantName,
-      measurandName,
-      terminalNames,
-    } = req.body;
-
-    if (
-      !plantId ||
-      !measurandId ||
-      !terminalIds ||
-      !Array.isArray(terminalIds)
-    ) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Missing required fields (plantId, measurandId, terminalIds) or terminalIds is not an array",
-      });
-    }
-
-    const newView = new MeasurandView({
-      profile: "custom",
-      plantId,
-      measurandId,
-      terminalIds,
-      plantName: plantName || "",
-      measurandName: measurandName || "",
-      terminalNames: terminalNames || [],
-    });
-
-    const savedView = await withRetry(async () => {
-      return await newView.save();
-    });
-
-    res.status(201).json({
-      success: true,
-      message: "Measurand view created successfully",
-      data: savedView,
-    });
-  } catch (error) {
-    log.error(`Error creating Measurand view: ${error.message}`);
-    res.status(500).json({
-      success: false,
-      message: "Failed to create Measurand view",
-      error: error.message,
-    });
-  }
-};
-
-// -------------------- 7. Update Measurand View --------------------
-exports.updateMeasurandView = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { terminalIds, terminalNames } = req.body;
-
-    if (!id || !terminalIds || !Array.isArray(terminalIds)) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Missing required fields (id, terminalIds) or terminalIds is not an array",
-      });
-    }
-
-    const updatedView = await withRetry(async () => {
-      return await MeasurandView.findByIdAndUpdate(
-        id,
-        {
-          terminalIds,
-          terminalNames: terminalNames || [],
-          updatedAt: Date.now(),
-        },
-        { new: true }
-      ).lean();
-    });
-
-    if (!updatedView) {
-      return res.status(404).json({
-        success: false,
-        message: "Measurand view not found",
-      });
-    }
-
-    log.info(`Updated Measurand view: ${id}`);
-    res.status(200).json({
-      success: true,
-      message: "Measurand view updated successfully",
-      data: updatedView,
-    });
-  } catch (error) {
-    log.error(`Error updating Measurand view: ${error.message}`);
-    res.status(500).json({
-      success: false,
-      message: "Failed to update Measurand view",
-      error: error.message,
-    });
-  }
-};
-
-// -------------------- 8. Delete Measurand View --------------------
-exports.deleteMeasurandView = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    if (!id) {
-      return res.status(400).json({
-        success: false,
-        message: "Missing required field: id",
-      });
-    }
-
-    const deletedView = await withRetry(async () => {
-      return await MeasurandView.findByIdAndDelete(id).lean();
-    });
-
-    if (!deletedView) {
-      return res.status(404).json({
-        success: false,
-        message: "Measurand view not found",
-      });
-    }
-
-    log.info(`Deleted Measurand view: ${id}`);
-    res.status(200).json({
-      success: true,
-      message: "Measurand view deleted successfully",
-      data: deletedView,
-    });
-  } catch (error) {
-    log.error(`Error deleting Measurand view: ${error.message}`);
-    res.status(500).json({
-      success: false,
-      message: "Failed to delete Measurand view",
       error: error.message,
     });
   }

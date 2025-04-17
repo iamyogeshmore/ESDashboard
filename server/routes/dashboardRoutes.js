@@ -3,6 +3,9 @@ const router = express.Router();
 const dashboardController = require("../controllers/dashboardController");
 const { broadcastUpdate } = require("../websocket");
 
+const asyncHandler = (fn) => (req, res, next) => {
+  Promise.resolve(fn(req, res, next)).catch(next);
+};
 // -------------------- 1. Creates a new dashboard --------------------
 router.post("/dashboards", async (req, res) => {
   const result = await dashboardController.createDashboard(req, res);
@@ -138,6 +141,25 @@ router.put(
     }
   }
 );
+
+// -------------------- 10. Updates widget selections for a specific data grid in a dashboard --------------------
+router.put(
+  "/dashboards/:name/widgets/:widgetId/selectionsDataGrid",
+  async (req, res) => {
+    const result = await dashboardController.updateWidgetSelectionsDataGrid(
+      req,
+      res
+    );
+    if (result.status === 200) {
+      broadcastUpdate({ type: "widgetSelectionsUpdated", data: result.data });
+      res.status(200).json(result.data);
+    } else {
+      res
+        .status(result.status)
+        .json({ error: result.error, message: result.message });
+    }
+  }
+);
 // -------------------- 11. Updates widget properties for a specific widget in a dashboard --------------------
 // Modified route for updating widget properties
 router.patch("/dashboards/widgets/:widgetId/properties", async (req, res) => {
@@ -154,5 +176,14 @@ router.patch("/dashboards/widgets/:widgetId/properties", async (req, res) => {
 
 // -------------------- 12. Pop up beacons --------------------
 router.get("/getbeacons", dashboardController.GetBeacons);
+
+router.get(
+  "/:name/widgets/:widgetId",
+  asyncHandler(async (req, res) => {
+    const result = await dashboardController.getWidgetData(req, res);
+    res.status(result.status).json(result.data || { error: result.error });
+  })
+);
+
 
 module.exports = router;

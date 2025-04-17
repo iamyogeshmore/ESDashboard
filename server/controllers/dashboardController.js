@@ -61,6 +61,43 @@ exports.getActiveDashboard = async (req, res) => {
 exports.updateWidgetSelections = async (req, res) => {
   try {
     const { name, widgetId } = req.params;
+    const { selectedMeasurands, thresholds } = req.body;
+
+    const dashboard = await Dashboard.findOne({ name });
+    if (!dashboard) {
+      return { status: 404, error: "Dashboard not found" };
+    }
+
+    const widget = dashboard.widgets.find((w) => w.id === Number(widgetId));
+    if (!widget) {
+      return { status: 404, error: "Widget not found" };
+    }
+
+    // Update selectedMeasurands and thresholds
+    widget.selectedMeasurands = selectedMeasurands.map((m) => ({
+      id: m.id,
+      name: m.name || "",
+    }));
+    widget.thresholds = {
+      percentage:
+        thresholds.percentage !== undefined
+          ? Number(thresholds.percentage)
+          : null,
+    };
+
+    dashboard.updatedAt = Date.now();
+    await dashboard.save();
+
+    return { status: 200, data: widget };
+  } catch (error) {
+    return { status: 500, error: "Server error", message: error.message };
+  }
+};
+
+// --------------------- data grid ---------------------
+exports.updateWidgetSelectionsDataGrid = async (req, res) => {
+  try {
+    const { name, widgetId } = req.params;
     const { selectedPlant, selectedTerminals, selectedMeasurements } = req.body;
 
     const dashboard = await Dashboard.findOne({ name });
@@ -109,9 +146,16 @@ exports.createWidget = async (req, res) => {
       selectedPlant: widgetData.selectedPlant || "",
       selectedTerminals: widgetData.selectedTerminals || [],
       selectedMeasurements: widgetData.selectedMeasurements || [],
-      plantId: widgetData.plantId || "", // Save plantId
-      terminalId: widgetData.terminalId || "", // Save terminalId
-      measurandId: widgetData.measurandId || "", // Save measurandId
+      plantId: widgetData.plantId || "",
+      terminalId: widgetData.terminalId || "",
+      measurandId: widgetData.measurandId || "",
+      selectedMeasurands: widgetData.selectedMeasurands || [],
+      thresholds: {
+        percentage:
+          widgetData.thresholds?.percentage !== undefined
+            ? Number(widgetData.thresholds.percentage)
+            : null,
+      },
     };
 
     dashboard.widgets.push(newWidget);
@@ -122,6 +166,7 @@ exports.createWidget = async (req, res) => {
     return { status: 500, error: "Server error", message: error.message };
   }
 };
+
 // -------------------- 7. Deletes a specific widget from a dashboard by widget ID --------------------
 exports.deleteWidget = async (req, res) => {
   try {
@@ -216,11 +261,11 @@ exports.deleteDashboard = async (req, res) => {
     return { status: 500, error: "Server error", message: error.message };
   }
 };
+
 // -------------------- 11. Updates properties for a specific widget in a dashboard --------------------
-// Modified updateWidgetProperties function
 exports.updateWidgetProperties = async (req, res) => {
   try {
-    const { widgetId } = req.params; // Removed 'name' parameter
+    const { widgetId } = req.params;
     const properties = req.body;
 
     if (!properties || Object.keys(properties).length === 0) {
@@ -260,9 +305,47 @@ exports.updateWidgetProperties = async (req, res) => {
 exports.GetBeacons = async (req, res) => {
   try {
     const beacon = await ESBeacon.find();
-    res.status(200).json(beacon);
+    return { status: 200, data: beacon };
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Failed to fetch beacons" });
+    return {
+      status: 500,
+      error: "Failed to fetch beacons",
+      message: error.message,
+    };
+  }
+};
+
+// -------------------- 13. Retrieves data for a specific widget --------------------
+exports.getWidgetData = async (req, res) => {
+  try {
+    const { name, widgetId } = req.params;
+    const dashboard = await Dashboard.findOne({ name });
+    if (!dashboard) {
+      return { status: 404, error: "Dashboard not found" };
+    }
+
+    const widget = dashboard.widgets.find((w) => w.id === Number(widgetId));
+    if (!widget) {
+      return { status: 404, error: "Widget not found" };
+    }
+
+    // Return widget data including selectedMeasurands and thresholds
+    return {
+      status: 200,
+      data: {
+        id: widget.id,
+        type: widget.type,
+        name: widget.name,
+        plantId: widget.plantId,
+        terminalId: widget.terminalId,
+        measurandId: widget.measurandId,
+        selectedMeasurands: widget.selectedMeasurands || [],
+        thresholds: widget.thresholds || { percentage: null },
+        settings: widget.settings || {},
+        layout: widget.layout || {},
+      },
+    };
+  } catch (error) {
+    return { status: 500, error: "Server error", message: error.message };
   }
 };
