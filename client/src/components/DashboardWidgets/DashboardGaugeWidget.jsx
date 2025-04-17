@@ -216,7 +216,7 @@ const DashboardGaugeWidget = ({ data, width, height }) => {
                 }}
               >
                 {isNumeric
-                  ? displayValue.toFixed(data.decimals || 1)
+                  ? displayValue.toFixed(data.decimals )
                   : displayValue}
               </Typography>
               {data.unit && isNumeric && (

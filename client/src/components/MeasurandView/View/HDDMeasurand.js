@@ -76,12 +76,24 @@ const HDDMeasurand = () => {
     severity: "success",
   });
 
-  const API_BASE_URL = "http://localhost:6005/api";
+  const API_BASE_URL = "http://localhost:6005/api/measurand-hdd";
 
-  // Fetch existing tables (mocked as local state for now; replace with API if needed)
   useEffect(() => {
-    // Optionally fetch tables from an API endpoint if you have one
-    // axios.get(`${API_BASE_URL}/tables`).then((response) => setTables(response.data));
+    axios
+      .get(`${API_BASE_URL}/`)
+      .then((response) => {
+        if (response.data.success) {
+          setTables(response.data.data);
+        }
+      })
+      .catch((error) => {
+        console.error("Error fetching tables:", error);
+        setSnackbar({
+          open: true,
+          message: "Failed to fetch tables",
+          severity: "error",
+        });
+      });
   }, []);
 
   const handleTableCreate = (tableData) => {
@@ -94,19 +106,7 @@ const HDDMeasurand = () => {
       return;
     }
 
-    const plant = tableData.plantId; // Assuming plantId is the ID
-    const measurand = tableData.measurandId;
-    const terminalIds = tableData.terminalIds;
-
-    const newTable = {
-      _id: `table-${Date.now()}`,
-      profile: "measurand",
-      plantId: plant,
-      measurandId: measurand,
-      terminalIds: terminalIds,
-      createdAt: new Date().toISOString(),
-    };
-    setTables((prev) => [...prev, newTable]);
+    setTables((prev) => [...prev, tableData]);
     setSnackbar({
       open: true,
       message: "Table created successfully!",
@@ -116,12 +116,33 @@ const HDDMeasurand = () => {
   };
 
   const handleDeleteTable = () => {
-    setTables((prev) => prev.filter((table) => table._id !== tableToDelete));
-    setSnackbar({
-      open: true,
-      message: "Table deleted successfully!",
-      severity: "error",
-    });
+    axios
+      .delete(`${API_BASE_URL}/${tableToDelete}`)
+      .then((response) => {
+        if (response.data.success) {
+          setTables((prev) =>
+            prev.filter((table) => table._id !== tableToDelete)
+          );
+          setSnackbar({
+            open: true,
+            message: "Table deleted successfully!",
+            severity: "error",
+          });
+        } else {
+          setSnackbar({
+            open: true,
+            message: response.data.message,
+            severity: "error",
+          });
+        }
+      })
+      .catch((error) => {
+        setSnackbar({
+          open: true,
+          message: "Failed to delete table",
+          severity: "error",
+        });
+      });
     setDeleteDialogOpen(false);
     setTableToDelete(null);
   };
@@ -184,12 +205,10 @@ const HDDMeasurand = () => {
                             height: 56,
                           }}
                         >
-                          {table.profile.charAt(0).toUpperCase()}
+                          {table.measurandName?.charAt(0)?.toUpperCase() || "M"}
                         </Avatar>
                         <Typography variant="h6" fontWeight="bold">
-                          {table.profile.charAt(0).toUpperCase() +
-                            table.profile.slice(1)}{" "}
-                          Profile
+                          {table.measurandName || "Measurand View"}
                         </Typography>
                       </Box>
                       <Box
@@ -204,7 +223,7 @@ const HDDMeasurand = () => {
                             sx={{ mr: 1, color: "text.secondary" }}
                           />
                           <Typography color="text.secondary">
-                            Plant: {table.plantId}
+                            Plant: {table.plantName || "Unknown"}
                           </Typography>
                         </Box>
                         <Box sx={{ display: "flex", alignItems: "center" }}>
@@ -212,11 +231,11 @@ const HDDMeasurand = () => {
                             sx={{ mr: 1, color: "text.secondary" }}
                           />
                           <Typography color="text.secondary">
-                            Measurand: {table.measurandId}
+                            Measurand: {table.measurandName || "Unknown"}
                           </Typography>
                         </Box>
                         <Chip
-                          label={`${table.terminalIds.length} Terminals`}
+                          label={`${table.terminalNames.length} Terminals`}
                           color="primary"
                           variant="outlined"
                           sx={{ alignSelf: "flex-start", mt: 1 }}

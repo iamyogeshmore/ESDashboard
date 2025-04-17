@@ -105,7 +105,7 @@ const DashboardDataGridWidget = ({
     }
 
     try {
-      const url = `${API_BASE_URL}/dashboards/${dashboardName}/widgets/${data.id}/selections`;
+      const url = `${API_BASE_URL}/dashboards/${dashboardName}/widgets/${data.id}/selectionsDataGrid`;
       await axios.put(url, {
         selectedPlant,
         selectedTerminals,

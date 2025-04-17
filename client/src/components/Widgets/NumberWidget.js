@@ -18,7 +18,6 @@ import {
 } from "@mui/icons-material";
 import DeleteConfirmationDialog from "../DeleteConfirmationDialog";
 
-// ------------------- Timestamp Formatting Function -------------------
 const formatTimestamp = (timestamp) => {
   if (!timestamp) return "No timestamp available";
   const date = new Date(timestamp);
@@ -31,11 +30,9 @@ const formatTimestamp = (timestamp) => {
     second: "2-digit",
     hour12: false,
     timeZone: "Asia/Kolkata",
-
   });
 };
 
-// ------------------ Default Widget Settings ------------------
 const customDefaultWidgetSettings = {
   backgroundColor: "#334155",
   borderColor: "#94A3B8",
@@ -58,9 +55,11 @@ const NumberWidget = ({
   title,
   widgetId,
   fetchValue,
-  terminalInfo,
+  terminalName,
+  measurandName,
   value: externalValue,
   timestamp: externalTimestamp,
+  unit,
   onDelete,
   onOpenProperties,
   ...initialProperties
@@ -70,12 +69,12 @@ const NumberWidget = ({
   const [isHovered, setIsHovered] = useState(false);
   const [internalValue, setInternalValue] = useState(null);
   const [internalTimestamp, setInternalTimestamp] = useState(null);
+  const [internalUnit, setInternalUnit] = useState(unit || "");
   const [error, setError] = useState(null);
   const [anchorEl, setAnchorEl] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const menuButtonRef = useRef(null);
 
-  // ------------------- Widget Settings from Local Storage -------------------
   const styles = useMemo(() => {
     const storedSettings = widgetId
       ? localStorage.getItem(`widgetSettings_${widgetId}`)
@@ -96,7 +95,6 @@ const NumberWidget = ({
       : baseStyles;
   }, [widgetId, initialProperties, isDarkMode]);
 
-  // ------------------- Effect to Fetch Value -------------------
   useEffect(() => {
     if (!fetchValue || externalValue !== undefined) return;
 
@@ -115,10 +113,12 @@ const NumberWidget = ({
           ) {
             setInternalValue("N/A");
             setInternalTimestamp(fetchedData.timestamp || null);
+            setInternalUnit(fetchedData.unit || "");
             setError(null);
           } else {
             setInternalValue(fetchedData.value);
             setInternalTimestamp(fetchedData.timestamp);
+            setInternalUnit(fetchedData.unit || "");
             setError(null);
           }
         }
@@ -131,7 +131,7 @@ const NumberWidget = ({
     };
 
     loadValue();
-    const interval = setInterval(loadValue, 1000);
+    const interval = setInterval(loadValue, 5000); // Changed to 5 seconds
 
     return () => {
       isMounted = false;
@@ -144,6 +144,7 @@ const NumberWidget = ({
     externalValue !== undefined ? externalValue : internalValue;
   const displayTimestamp =
     externalTimestamp !== undefined ? externalTimestamp : internalTimestamp;
+  const displayUnit = unit !== undefined ? unit : internalUnit;
   const tooltipTitle = `Last sync: ${formatTimestamp(displayTimestamp)}`;
 
   const handleMenuClick = (event) => setAnchorEl(event.currentTarget);
@@ -214,7 +215,7 @@ const NumberWidget = ({
                 whiteSpace: "nowrap",
               }}
             >
-              {title}
+              {terminalName || title || "Unknown Terminal"}
             </Typography>
             <Box
               sx={{
@@ -316,7 +317,9 @@ const NumberWidget = ({
               : displayValue === "N/A"
               ? "N/A"
               : displayValue !== null && displayValue !== undefined
-              ? displayValue.toFixed(styles.decimalPlaces || 2)
+              ? `${displayValue.toFixed(styles.decimalPlaces || 2)} ${
+                  displayUnit || ""
+                }`
               : "N/A"}
           </Typography>
         </Box>
@@ -326,7 +329,9 @@ const NumberWidget = ({
           onClose={handleDeleteCancel}
           onConfirm={handleDeleteConfirm}
           title="Confirm Widget Deletion"
-          message={`Are you sure you want to delete the "${title}" widget? This action cannot be undone.`}
+          message={`Are you sure you want to delete the "${
+            terminalName || title
+          }" widget? This action cannot be undone.`}
         />
       </Paper>
     </Tooltip>

@@ -59,7 +59,7 @@ const DashboardNumberWidget = ({
   const displayValue =
     value === null || value === undefined
       ? "N/A"
-      : value.toFixed(data.decimals || 2);
+      : value.toFixed(data.decimals);
 
   return (
     <Tooltip title={tooltipTitle} arrow>

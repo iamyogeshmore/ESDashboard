@@ -1,8 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Box, Tabs, Tab, Paper, Fade, useTheme } from "@mui/material";
 import { styled } from "@mui/material/styles";
-import CDDMeasurand from "../components/MeasurandView/View/CDDMeasurand";
-import HDDMeasurand from "../components/MeasurandView/View/HDDMeasurand";
+import MeasurandCurrentView from "../components/MeasurandView/View/CDDMeasurand";
+import MeasurandHistoryView from "../components/MeasurandView/View/HDDMeasurand";
 
 const StyledTab = styled(Tab)(({ theme }) => ({
   textTransform: "none",
@@ -34,8 +34,13 @@ const StyledTabs = styled(Tabs)(({ theme }) => ({
 }));
 
 const MeasurandView = () => {
-  const [activeTab, setActiveTab] = useState("CDD");
+  const [activeTab, setActiveTab] = useState("Current");
   const theme = useTheme();
+
+  useEffect(() => {
+    console.log("MeasurandView mounted");
+    return () => console.log("MeasurandView unmounted");
+  }, []);
 
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
@@ -75,22 +80,21 @@ const MeasurandView = () => {
           }}
         >
           <StyledTab
-            label="Current Data Display"
-            value="CDD"
-            aria-controls="cdd-panel"
-            id="cdd-tab"
+            label="Current Value"
+            value="Current"
+            aria-controls="current-panel"
+            id="current-tab"
           />
           <StyledTab
-            label="Historical Data Display"
-            value="HDD"
-            aria-controls="hdd-panel"
-            id="hdd-tab"
+            label="Historical Data"
+            value="History"
+            aria-controls="history-panel"
+            id="history-tab"
           />
         </StyledTabs>
 
         <Box
           sx={{
-            p: 2,
             flexGrow: 1,
             backgroundColor: theme.palette.background.paper,
             overflow: "auto",
@@ -98,11 +102,11 @@ const MeasurandView = () => {
           role="tabpanel"
         >
           <Fade in={true} timeout={500}>
-            <Box sx={{ height: "100%" }}>
-              {activeTab === "CDD" ? (
-                <CDDMeasurand aria-labelledby="cdd-tab" />
+            <Box>
+              {activeTab === "Current" ? (
+                <MeasurandCurrentView aria-labelledby="current-tab" />
               ) : (
-                <HDDMeasurand aria-labelledby="hdd-tab" />
+                <MeasurandHistoryView aria-labelledby="history-tab" />
               )}
             </Box>
           </Fade>

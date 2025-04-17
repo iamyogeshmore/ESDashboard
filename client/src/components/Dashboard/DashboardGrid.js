@@ -35,6 +35,7 @@ const DashboardGrid = ({
       plants: widget.plants || [],
       terminals: widget.terminals || [],
       measurands: widget.measurands || [],
+      dashboardName,
     };
 
     return (

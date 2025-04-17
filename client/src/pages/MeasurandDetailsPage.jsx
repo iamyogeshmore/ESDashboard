@@ -1,4 +1,3 @@
-// MeasurandDetailsPage.jsx (updated)
 import React, { useState, useEffect, useCallback, useContext } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -13,13 +12,20 @@ import {
   TextField,
   Chip,
   IconButton,
-  FormControl,
   Button,
   Snackbar,
   Slide,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  FormControl,
   InputLabel,
   Select,
   MenuItem,
+  Checkbox,
+  ListItemText,
+  Divider,
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
@@ -27,8 +33,7 @@ import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import TableChartIcon from "@mui/icons-material/TableChart";
 import BarChartIcon from "@mui/icons-material/BarChart";
 import { ArrowUpward, ArrowDownward } from "@mui/icons-material";
-import DeleteIcon from "@mui/icons-material/Delete";
-import SaveIcon from "@mui/icons-material/Save";
+import EditIcon from "@mui/icons-material/Edit";
 import MuiAlert from "@mui/material/Alert";
 import { styled } from "@mui/material/styles";
 import jsPDF from "jspdf";
@@ -38,7 +43,7 @@ import "../styles/TableDetailsPage.css";
 import { ThemeContext } from "../contexts/ThemeContext";
 import GraphComponent from "../components/Widgets/HDDGraph";
 
-const BASE_URL = `${process.env.REACT_APP_API_LOCAL_URL}api/measurand`;
+const BASE_URL = "http://localhost:6005/api/measurand-hdd";
 
 const formatTimestamp = (timestamp) => {
   if (!timestamp) return "No timestamp available";
@@ -57,7 +62,7 @@ const formatTimestamp = (timestamp) => {
 
 const historicalCache = {};
 
-// Styled components (unchanged from previous)
+// Styled components
 const DifferenceBox = styled(Box)(({ theme, isNegative, isZero }) => ({
   display: "flex",
   alignItems: "center",
@@ -187,10 +192,11 @@ const MeasurandDetailsPage = () => {
   const [loading, setLoading] = useState(false);
   const [gridLoading, setGridLoading] = useState(true);
   const [plantInfo, setPlantInfo] = useState({});
-  const [terminalInfo, setTerminalInfo] = useState([]); // Array of terminals
+  const [terminalInfo, setTerminalInfo] = useState([]);
   const [historicalData, setHistoricalData] = useState([]);
-  const [savedViews, setSavedViews] = useState([]);
-  const [selectedView, setSelectedView] = useState("");
+  const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
+  const [terminals, setTerminals] = useState([]);
+  const [selectedTerminalIds, setSelectedTerminalIds] = useState([]);
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: "",
@@ -246,32 +252,50 @@ const MeasurandDetailsPage = () => {
   const fetchMeasurandData = useCallback(async () => {
     setLoading(true);
     setGridLoading(true);
-    showSnackbar("Fetching measurand data", "info", true);
+    showSnackbar("Fetching measurand view data", "info", true);
 
     try {
-      const response = await axios.get(
-        `${BASE_URL}/hdd/measurands/info/${measurandId}`
-      );
+      const response = await axios.get(`${BASE_URL}/${measurandId}`);
       if (!response.data.success) throw new Error(response.data.message);
       const data = response.data.data;
       setMeasurand({
         id: data.measurandId,
-        name: data.measurandName,
+        name: data.measurandName || `Measurand ${data.measurandId}`,
         plantId: data.plantId,
       });
       setPlantInfo({ id: data.plantId, name: data.plantName || "Unknown" });
-      setTerminalInfo([
-        { id: data.terminalId, name: data.terminalName || "Unknown" },
-      ]);
-      showSnackbar("Measurand data loaded successfully", "success");
+      setTerminalInfo(
+        data.terminalIds.map((id, idx) => ({
+          id,
+          name: data.terminalNames[idx] || `Terminal ${id}`,
+        }))
+      );
+      setSelectedTerminalIds(data.terminalIds);
+      showSnackbar("Measurand view data loaded successfully", "success");
     } catch (error) {
-      console.error("Error fetching measurand:", error);
-      showSnackbar(error.message || "Failed to load measurand data", "error");
+      console.error("Error fetching measurand view:", error);
+      showSnackbar(
+        error.message || "Failed to load measurand view data",
+        "error"
+      );
     } finally {
       setLoading(false);
       setGridLoading(false);
     }
   }, [measurandId]);
+
+  const fetchTerminals = useCallback(async () => {
+    if (!measurand || !plantInfo.id) return;
+    try {
+      const response = await axios.get(
+        `http://localhost:6005/api/measurand/terminals/plant/${plantInfo.id}/measurand/${measurand.id}`
+      );
+      setTerminals(response.data);
+    } catch (error) {
+      console.error("Error fetching terminals:", error);
+      showSnackbar("Failed to fetch terminals", "error");
+    }
+  }, [measurand, plantInfo]);
 
   const fetchHistoricalMeasurandValues = useCallback(async () => {
     if (!terminalInfo.length || !measurand?.id) return;
@@ -291,7 +315,7 @@ const MeasurandDetailsPage = () => {
 
         return axios
           .get(
-            `${BASE_URL}/hdd/historical/${terminal.id}/${measurand.id}?from=${dateFilter.start}&to=${dateFilter.end}`
+            `${BASE_URL}/historical/${terminal.id}/${measurand.id}?from=${dateFilter.start}&to=${dateFilter.end}`
           )
           .then((response) => {
             if (!response.data.success) throw new Error(response.data.message);
@@ -317,90 +341,48 @@ const MeasurandDetailsPage = () => {
     }
   }, [measurand, terminalInfo, dateFilter]);
 
-  const fetchSavedViews = useCallback(async () => {
-    try {
-      const response = await axios.get(`${BASE_URL}/`);
-      if (response.data.success) {
-        setSavedViews(response.data.data);
-      }
-    } catch (error) {
-      console.error("Error fetching saved views:", error);
-      showSnackbar("Failed to fetch saved views", "error");
-    }
-  }, []);
-
   useEffect(() => {
     fetchMeasurandData();
-    fetchSavedViews();
-  }, [fetchMeasurandData, fetchSavedViews]);
+  }, [fetchMeasurandData]);
 
   useEffect(() => {
     if (measurand) {
       fetchHistoricalMeasurandValues();
+      fetchTerminals();
     }
-  }, [measurand, terminalInfo, fetchHistoricalMeasurandValues]);
+  }, [measurand, terminalInfo, fetchHistoricalMeasurandValues, fetchTerminals]);
 
-  const handleSaveView = async () => {
-    showSnackbar("Saving measurand view", "info", true);
+  const handleUpdateTerminals = async () => {
+    if (!selectedTerminalIds.length) {
+      showSnackbar("At least one terminal must be selected", "error");
+      return;
+    }
+
     try {
-      const viewData = {
-        plantId: plantInfo.id,
-        measurandId: measurand.id,
-        terminalIds: terminalInfo.map((t) => t.id),
-        plantName: plantInfo.name,
-        measurandName: measurand.name,
-        terminalNames: terminalInfo.map((t) => t.name),
+      const selectedTerminals = terminals.filter((t) =>
+        selectedTerminalIds.includes(t.terminalId)
+      );
+      const updateData = {
+        terminalIds: selectedTerminalIds,
+        terminalNames: selectedTerminals.map((t) => t.terminalName),
       };
-      const response = await axios.post(`${BASE_URL}/create`, viewData);
+      const response = await axios.put(
+        `${BASE_URL}/${measurandId}`,
+        updateData
+      );
       if (!response.data.success) throw new Error(response.data.message);
-      setSavedViews((prev) => [...prev, response.data.data]);
-      showSnackbar("Measurand view saved successfully", "success");
+      setTerminalInfo(
+        updateData.terminalIds.map((id, idx) => ({
+          id,
+          name: updateData.terminalNames[idx],
+        }))
+      );
+      setUpdateDialogOpen(false);
+      showSnackbar("Measurand view updated successfully", "success");
+      fetchHistoricalMeasurandValues();
     } catch (error) {
-      console.error("Error saving view:", error);
-      showSnackbar(error.message || "Failed to save view", "error");
-    }
-  };
-
-  const handleViewChange = async (event) => {
-    const viewId = event.target.value;
-    setSelectedView(viewId);
-    if (viewId) {
-      try {
-        const response = await axios.get(`${BASE_URL}/${viewId}`);
-        if (response.data.success) {
-          const view = response.data.data;
-          setMeasurand({
-            id: view.measurandId,
-            name: view.measurandName,
-            plantId: view.plantId,
-          });
-          setPlantInfo({ id: view.plantId, name: view.plantName });
-          setTerminalInfo(
-            view.terminalIds.map((id, idx) => ({
-              id,
-              name: view.terminalNames[idx] || `Terminal ${id}`,
-            }))
-          );
-          fetchHistoricalMeasurandValues();
-          showSnackbar("View loaded successfully", "success");
-        }
-      } catch (error) {
-        showSnackbar("Failed to load view", "error");
-      }
-    }
-  };
-
-  const handleDeleteView = async () => {
-    if (!selectedView) return;
-    try {
-      const response = await axios.delete(`${BASE_URL}/${selectedView}`);
-      if (response.data.success) {
-        setSavedViews((prev) => prev.filter((v) => v._id !== selectedView));
-        setSelectedView("");
-        showSnackbar("View deleted successfully", "success");
-      }
-    } catch (error) {
-      showSnackbar("Failed to delete view", "error");
+      console.error("Error updating view:", error);
+      showSnackbar(error.message || "Failed to update view", "error");
     }
   };
 
@@ -494,6 +476,7 @@ const MeasurandDetailsPage = () => {
           return (
             <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
               <Typography variant="body2">
+                irq
                 {currentValue !== null ? currentValue.toFixed(2) : "N/A"}
               </Typography>
               {difference !== null && (
@@ -649,7 +632,7 @@ const MeasurandDetailsPage = () => {
           Back to Measurands
         </StyledButton>
         <Typography variant="h5" color="error" sx={{ mt: 2 }}>
-          Measurand not found
+          Measurand view not found
         </Typography>
       </Box>
     );
@@ -684,7 +667,7 @@ const MeasurandDetailsPage = () => {
               variant="h6"
               sx={{ ml: 2, fontWeight: 600, letterSpacing: 0.5 }}
             >
-              Measurand Details - {measurand.name}
+              Measurand View - {measurand.name}
             </Typography>
           </Box>
         </Toolbar>
@@ -743,41 +726,12 @@ const MeasurandDetailsPage = () => {
             </Box>
             <StyledButton
               variant="contained"
-              startIcon={<SaveIcon />}
-              onClick={handleSaveView}
+              startIcon={<EditIcon />}
+              onClick={() => setUpdateDialogOpen(true)}
               fullWidth
             >
-              Save View
+              Update Terminals
             </StyledButton>
-            <FormControl fullWidth sx={{ mt: 2 }}>
-              <InputLabel>Saved Views</InputLabel>
-              <Select
-                value={selectedView}
-                onChange={handleViewChange}
-                label="Saved Views"
-              >
-                <MenuItem value="">
-                  <em>None</em>
-                </MenuItem>
-                {savedViews.map((view) => (
-                  <MenuItem key={view._id} value={view._id}>
-                    {view.measurandName} - {view.plantName}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            {selectedView && (
-              <StyledButton
-                variant="outlined"
-                color="error"
-                startIcon={<DeleteIcon />}
-                onClick={handleDeleteView}
-                fullWidth
-                sx={{ mt: 2 }}
-              >
-                Delete View
-              </StyledButton>
-            )}
             <Typography variant="h6" sx={{ mt: 3, mb: 2 }}>
               Date Filters
             </Typography>
@@ -896,6 +850,67 @@ const MeasurandDetailsPage = () => {
           </StyledPaper>
         </Grid>
       </Grid>
+
+      <Dialog
+        open={updateDialogOpen}
+        onClose={() => setUpdateDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          <Typography variant="h6">Update Terminals</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Select or remove terminals for this measurand view
+          </Typography>
+        </DialogTitle>
+        <Divider />
+        <DialogContent>
+          <FormControl fullWidth>
+            <InputLabel id="terminal-label">Terminal Options</InputLabel>
+            <Select
+              labelId="terminal-label"
+              multiple
+              value={selectedTerminalIds}
+              label="Terminal Options"
+              onChange={(e) => setSelectedTerminalIds(e.target.value)}
+              renderValue={(selected) => (
+                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                  {selected.map((value) => (
+                    <Chip
+                      key={value}
+                      label={
+                        terminals.find((t) => t.terminalId === value)
+                          ?.terminalName
+                      }
+                    />
+                  ))}
+                </Box>
+              )}
+            >
+              {terminals.map((terminal) => (
+                <MenuItem key={terminal.terminalId} value={terminal.terminalId}>
+                  <Checkbox
+                    checked={selectedTerminalIds.includes(terminal.terminalId)}
+                  />
+                  <ListItemText primary={terminal.terminalName} />
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setUpdateDialogOpen(false)} color="inherit">
+            Cancel
+          </Button>
+          <Button
+            onClick={handleUpdateTerminals}
+            variant="contained"
+            disabled={!selectedTerminalIds.length}
+          >
+            Update
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {graphDialog.open && (
         <GraphComponent

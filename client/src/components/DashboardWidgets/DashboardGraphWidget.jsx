@@ -21,14 +21,21 @@ import {
   IconButton,
   useTheme,
   Drawer,
-  MenuItem,
   FormControl,
-  Select,
   InputLabel,
+  Select,
+  MenuItem,
   Button,
   Menu,
   Snackbar,
   Alert,
+  TextField,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  FormControlLabel,
+  Checkbox,
 } from "@mui/material";
 import {
   DragHandle,
@@ -81,94 +88,74 @@ const colorOptions = [
 
 const GraphPaper = styled(Paper)(
   ({ theme, isDarkMode, isFullscreen, settings }) => ({
-    height: isFullscreen ? "100vh" : "100%",
-    width: isFullscreen ? "100vw" : "100%",
-    padding: theme.spacing(2),
-    background:
-      settings?.backgroundColor ||
-      (isDarkMode
-        ? "linear-gradient(145deg, #2a2a2a 0%, #1f1f1f 100%)"
-        : "#ffffff"),
-    borderRadius: isFullscreen ? 0 : settings?.borderRadius || "3px",
-    border: `${settings?.borderWidth || "1px"} solid ${
-      settings?.borderColor || "#e0e0e0"
-    }`,
-    boxShadow: isDarkMode
-      ? "0 4px 20px rgba(0, 0, 0, 0.5)"
-      : "0 4px 20px rgba(0, 0, 0, 0.05)",
-    transition: "all 0.3s ease",
-    "&:hover": !isFullscreen && {
-      transform: "translateY(-2px)",
-      boxShadow: isDarkMode
-        ? "0 6px 24px rgba(0, 0, 0, 0.6)"
-        : "0 6px 24px rgba(0, 0, 0, 0.1)",
-    },
+    width: "100%",
+    height: isFullscreen ? "100vh" : "auto",
     display: "flex",
     flexDirection: "column",
-    position: isFullscreen ? "fixed" : "relative",
-    top: isFullscreen ? 0 : "auto",
-    left: isFullscreen ? 0 : "auto",
-    zIndex: isFullscreen ? 1300 : "auto",
+    borderRadius: settings.borderRadius || "8px",
+    border: settings.border || "none",
+    backgroundColor: isDarkMode
+      ? settings.backgroundColorDark || "#1f2937"
+      : settings.backgroundColor || "#ffffff",
     overflow: "hidden",
+    position: "relative",
+    "&:hover .widget-header": {
+      opacity: 1,
+    },
   })
 );
 
-const WidgetHeader = styled(Box)(({ theme, isDarkMode, settings }) => ({
+const WidgetHeader = styled(Box)(({ isDarkMode, settings }) => ({
   display: "flex",
+  alignItems: "center",
   justifyContent: "space-between",
-  alignItems: "center",
-  paddingBottom: theme.spacing(1),
-  borderBottom: `1px solid ${isDarkMode ? "#6b7280" : "#e5e7eb"}`,
-  cursor: "move",
-  color: settings?.titleColor || "#000000",
-}));
-
-const ControlButtons = styled(Box)(({ theme }) => ({
-  display: "flex",
-  gap: theme.spacing(0.5),
-  alignItems: "center",
-  position: "absolute",
-  right: 8,
-  top: 8,
-}));
-
-const StyledIconButton = styled(IconButton)(({ theme, isDarkMode }) => ({
+  padding: "6px 12px",
   backgroundColor: isDarkMode
-    ? "rgba(75, 85, 99, 0.8)"
-    : "rgba(255, 255, 255, 0.8)",
+    ? settings.headerBackgroundColorDark || "rgba(55, 65, 81, 0.5)"
+    : settings.headerBackgroundColor || "rgba(243, 244, 246, 0.5)",
+  backdropFilter: "blur(4px)",
+  opacity: 1,
+  transition: "opacity 0.3s ease",
+  borderBottom: isDarkMode
+    ? settings.headerBorderDark || "1px solid rgba(255, 255, 255, 0.1)"
+    : settings.headerBorder || "1px solid rgba(0, 0, 0, 0.1)",
+}));
+
+const ControlButtons = styled(Box)({
+  display: "flex",
+  alignItems: "center",
+  gap: "4px",
+  transition: "opacity 0.3s ease",
+});
+
+const StyledIconButton = styled(IconButton)(({ isDarkMode }) => ({
+  padding: "4px",
   "&:hover": {
     backgroundColor: isDarkMode
-      ? "rgba(107, 114, 128, 0.9)"
-      : "rgba(229, 231, 235, 0.9)",
+      ? "rgba(255, 255, 255, 0.1)"
+      : "rgba(0, 0, 0, 0.05)",
   },
 }));
 
-const Sidebar = styled(Drawer)(({ theme, isDarkMode }) => ({
+const Sidebar = styled(Drawer)(({ isDarkMode }) => ({
   "& .MuiDrawer-paper": {
-    width: 250,
+    width: 350,
     backgroundColor: isDarkMode ? "#1f2937" : "#ffffff",
-    borderLeft: `1px solid ${isDarkMode ? "#4b5563" : "#e5e7eb"}`,
-    padding: theme.spacing(2),
+    padding: "16px",
+    boxSizing: "border-box",
   },
 }));
 
-const ApplyButton = styled(Button)(({ theme, isDarkMode }) => ({
-  background: isDarkMode
-    ? "linear-gradient(45deg, #4b5563 30%, #6b7280 90%)"
-    : "linear-gradient(45deg, #10b981 30%, #34d399 90%)",
-  color: isDarkMode ? "#e5e7eb" : "#ffffff",
-  fontFamily: "Inter",
-  fontWeight: "600",
-  padding: "8px 16px",
-  borderRadius: "8px",
-  boxShadow: isDarkMode
-    ? "0 4px 12px rgba(0, 0, 0, 0.3)"
-    : "0 4px 12px rgba(0, 0, 0, 0.1)",
+const ApplyButton = styled(Button)(({ isDarkMode }) => ({
+  backgroundColor: isDarkMode ? "#3b82f6" : "#2563eb",
+  color: "#ffffff",
   "&:hover": {
-    background: isDarkMode
-      ? "linear-gradient(45deg, #6b7280 30%, #9ca3af 90%)"
-      : "linear-gradient(45deg, #059669 30%, #10b981 90%)",
+    backgroundColor: isDarkMode ? "#60a5fa" : "#1d4ed8",
   },
+  textTransform: "none",
+  fontWeight: 600,
+  fontFamily: "Inter",
+  borderRadius: "8px",
 }));
 
 const formatTimestamp = (timestamp) => {
@@ -233,18 +220,38 @@ const DashboardGraphWidget = ({
   const [isHovered, setIsHovered] = useState(false);
   const [graphData, setGraphData] = useState({});
   const [selectedMeasurands, setSelectedMeasurands] = useState(
-    data.measurandId ? [{ id: data.measurandId, color: colorOptions[0] }] : []
+    data.selectedMeasurands?.length > 0
+      ? data.selectedMeasurands.map((m, index) => ({
+          id: m.id,
+          name: m.name,
+          color:
+            m.color ||
+            colorOptions[index % colorOptions.length] ||
+            colorOptions[0],
+        }))
+      : data.measurandId
+      ? [
+          {
+            id: data.measurandId,
+            name: data.measurement,
+            color: colorOptions[0],
+          },
+        ]
+      : []
+  );
+  const [thresholds, setThresholds] = useState(
+    data.thresholds || { percentage: null }
   );
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [measurand, setMeasurand] = useState("");
-  const [color, setColor] = useState(colorOptions[0].name);
-  const [customColor, setCustomColor] = useState("#000000");
   const [availableMeasurands, setAvailableMeasurands] = useState([]);
+  const [measurandColors, setMeasurandColors] = useState({}); // Track color selections
   const [terminalDetails, setTerminalDetails] = useState({
     plantId: null,
     terminalId: null,
   });
+  const [percentageDialogOpen, setPercentageDialogOpen] = useState(false);
+  const [percentageInput, setPercentageInput] = useState("");
   const chartInstanceRef = useRef(null);
   const widgetRef = useRef(null);
   const [anchorEl, setAnchorEl] = useState(null);
@@ -255,15 +262,26 @@ const DashboardGraphWidget = ({
   const settings = data.settings || {};
 
   useEffect(() => {
-    const widgetSettings = localStorage.getItem(`widgetSettings_${data.id}`);
-    if (widgetSettings) {
+    const saveConfiguration = async () => {
       try {
-        // Settings are applied via WidgetProperties, no need to set here
+        await axios.put(
+          `${API_BASE_URL}/dashboards/${data.dashboardName}/widgets/${data.id}/selections`,
+          {
+            selectedMeasurands,
+            thresholds,
+          }
+        );
       } catch (error) {
-        console.error(`Error parsing settings for widget ${data.id}:`, error);
+        console.error("Error saving configuration:", error);
+        setSnackbarMessage("Failed to save configuration");
+        setSnackbarSeverity("error");
+        setSnackbarOpen(true);
       }
+    };
+    if (selectedMeasurands.length > 0 || thresholds.percentage) {
+      saveConfiguration();
     }
-  }, [data.id]);
+  }, [selectedMeasurands, thresholds, data.id, data.dashboardName]);
 
   const fetchTerminalDetails = async (terminalName) => {
     try {
@@ -305,6 +323,12 @@ const DashboardGraphWidget = ({
         MeasurandName: item.measurandName,
       }));
       setAvailableMeasurands(measurands);
+      // Initialize default colors for measurands
+      const initialColors = measurands.reduce((acc, measurand) => {
+        acc[measurand.MeasurandId] = "#000000"; // Default color
+        return acc;
+      }, {});
+      setMeasurandColors(initialColors);
     } catch (error) {
       console.error("Error fetching measurands:", error);
       setSnackbarMessage("Failed to fetch measurands for comparison");
@@ -395,6 +419,21 @@ const DashboardGraphWidget = ({
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
   }, [isFullscreen]);
 
+  const calculateThresholdLines = () => {
+    if (!thresholds.percentage || !graphData[selectedMeasurands[0]?.id])
+      return {};
+    const primaryData = graphData[selectedMeasurands[0].id] || [];
+    const values = primaryData.map((d) => d.value).filter((v) => !isNaN(v));
+    if (values.length === 0) return {};
+    const avg = values.reduce((sum, v) => sum + v, 0) / values.length;
+    const percentage = parseFloat(thresholds.percentage) / 100;
+    const minLine = avg * (1 - percentage);
+    const maxLine = avg * (1 + percentage);
+    return { minLine, maxLine };
+  };
+
+  const { minLine, maxLine } = calculateThresholdLines();
+
   const chartData = {
     labels:
       selectedMeasurands.length > 0 && graphData[selectedMeasurands[0].id]
@@ -402,31 +441,55 @@ const DashboardGraphWidget = ({
             formatTimestamp(d.timestamp)
           )
         : [],
-    datasets: selectedMeasurands.map((measurand) => {
-      const measurandInfo = availableMeasurands.find(
-        (m) => m.MeasurandId === measurand.id
-      );
-      const label = measurandInfo ? measurandInfo.MeasurandName : measurand.id;
-      const dataPoints = (graphData[measurand.id] || []).map((d) => d.value);
-      const pointRadius = dataPoints.map((_, index) =>
-        index === dataPoints.length - 1 ? 5 : 0
-      );
-      const pointBackgroundColor = dataPoints.map((_, index) =>
-        index === dataPoints.length - 1 ? "red" : measurand.color.value
-      );
-      return {
-        label,
-        data: dataPoints,
-        backgroundColor: measurand.color.bg,
-        borderColor: measurand.color.value,
-        fill: true,
-        tension: 0.3,
-        pointRadius,
-        pointBackgroundColor,
-        pointHoverRadius: 5,
-        borderWidth: 2,
-      };
-    }),
+    datasets: [
+      ...selectedMeasurands.map((measurand) => {
+        const dataPoints = (graphData[measurand.id] || []).map((d) => d.value);
+        const pointRadius = dataPoints.map((_, index) =>
+          index === dataPoints.length - 1 ? 5 : 0
+        );
+        const pointBackgroundColor = dataPoints.map((_, index) =>
+          index === dataPoints.length - 1 ? "red" : measurand.color.value
+        );
+        return {
+          label: measurand.name,
+          data: dataPoints,
+          backgroundColor: measurand.color.bg,
+          borderColor: measurand.color.value,
+          fill: true,
+          tension: 0.3,
+          pointRadius,
+          pointBackgroundColor,
+          pointHoverRadius: 5,
+          borderWidth: 2,
+        };
+      }),
+      ...(minLine !== undefined
+        ? [
+            {
+              label: "Percentage Min",
+              data: graphData[selectedMeasurands[0]?.id]?.map(() => minLine),
+              borderColor: "rgba(255, 165, 0, 0.8)",
+              borderDash: [5, 5],
+              fill: false,
+              pointRadius: 0,
+              borderWidth: 2,
+            },
+          ]
+        : []),
+      ...(maxLine !== undefined
+        ? [
+            {
+              label: "Percentage Max",
+              data: graphData[selectedMeasurands[0]?.id]?.map(() => maxLine),
+              borderColor: "rgba(0, 0, 255, 0.8)",
+              borderDash: [5, 5],
+              fill: false,
+              pointRadius: 0,
+              borderWidth: 2,
+            },
+          ]
+        : []),
+    ],
   };
 
   const options = {
@@ -471,14 +534,7 @@ const DashboardGraphWidget = ({
     },
     plugins: {
       legend: {
-        position: "top",
-        labels: {
-          color: isDarkMode ? "#d1d5db" : "#374151",
-          font: { size: 12, weight: "500", family: "Inter" },
-          usePointStyle: true,
-          padding: 12,
-          boxWidth: 8,
-        },
+        display: false, // Hide legend (measurand names)
       },
       tooltip: {
         enabled: true,
@@ -508,11 +564,13 @@ const DashboardGraphWidget = ({
       easing: "easeOutQuart",
       onProgress: (animation) => {
         const chart = animation.chart;
-        chart.data.datasets.forEach((dataset) => {
-          const lastIndex = dataset.data.length - 1;
-          if (lastIndex >= 0) {
-            dataset.pointRadius[lastIndex] =
-              5 * Math.abs(Math.sin(Date.now() / 200));
+        chart.data.datasets.forEach((dataset, index) => {
+          if (index < selectedMeasurands.length) {
+            const lastIndex = dataset.data.length - 1;
+            if (lastIndex >= 0) {
+              dataset.pointRadius[lastIndex] =
+                5 * Math.abs(Math.sin(Date.now() / 200));
+            }
           }
         });
         chart.update("none");
@@ -526,34 +584,28 @@ const DashboardGraphWidget = ({
 
   const handleSidebarToggle = () => setSidebarOpen(!sidebarOpen);
   const handleSidebarClose = () => setSidebarOpen(false);
-  const handleMeasurandChange = (event) => setMeasurand(event.target.value);
-  const handleColorChange = (event) => setColor(event.target.value);
-  const handleCustomColorChange = (event) => {
-    setCustomColor(event.target.value);
-    setColor("Custom");
-  };
 
-  const handleApplySelection = () => {
-    if (!measurand) {
-      setSnackbarMessage("Please select a measurand to compare");
-      setSnackbarSeverity("warning");
-      setSnackbarOpen(true);
-      return;
-    }
-    const selectedColor =
-      color === "Custom"
-        ? { name: "Custom", value: `${customColor}`, bg: `${customColor}33` }
-        : colorOptions.find((c) => c.name === color);
+  const handleCheckboxChange = (measurand) => {
     const newMeasurands = [...selectedMeasurands];
-    const measurandId = availableMeasurands.find(
-      (m) => m.MeasurandName === measurand
-    )?.MeasurandId;
-    const existingIndex = newMeasurands.findIndex((m) => m.id === measurandId);
+    const existingIndex = newMeasurands.findIndex(
+      (m) => m.id === measurand.MeasurandId
+    );
     if (existingIndex >= 0) {
-      newMeasurands[existingIndex] = { id: measurandId, color: selectedColor };
-      setSnackbarMessage("Measurand updated successfully");
+      newMeasurands.splice(existingIndex, 1);
+      setSnackbarMessage("Measurand removed successfully");
     } else if (newMeasurands.length < 3) {
-      newMeasurands.push({ id: measurandId, color: selectedColor });
+      const selectedColor = measurandColors[measurand.MeasurandId] || "#000000";
+      newMeasurands.push({
+        id: measurand.MeasurandId,
+        name: measurand.MeasurandName,
+        color: {
+          value: selectedColor,
+          bg: `rgba(${parseInt(selectedColor.slice(1, 3), 16)}, ${parseInt(
+            selectedColor.slice(3, 5),
+            16
+          )}, ${parseInt(selectedColor.slice(5, 7), 16)}, 0.2)`,
+        },
+      });
       setSnackbarMessage("Measurand added successfully");
     } else {
       setSnackbarMessage("Maximum 3 measurands allowed for comparison");
@@ -562,10 +614,50 @@ const DashboardGraphWidget = ({
       return;
     }
     setSelectedMeasurands(newMeasurands);
-    setMeasurand("");
-    setColor(colorOptions[0].name);
-    setCustomColor("#000000");
-    setSidebarOpen(false);
+    setSnackbarSeverity("success");
+    setSnackbarOpen(true);
+  };
+
+  const handleColorChange = (measurandId, color) => {
+    setMeasurandColors((prev) => ({
+      ...prev,
+      [measurandId]: color,
+    }));
+    // Update color for already selected measurand
+    const newMeasurands = selectedMeasurands.map((m) =>
+      m.id === measurandId
+        ? {
+            ...m,
+            color: {
+              value: color,
+              bg: `rgba(${parseInt(color.slice(1, 3), 16)}, ${parseInt(
+                color.slice(3, 5),
+                16
+              )}, ${parseInt(color.slice(5, 7), 16)}, 0.2)`,
+            },
+          }
+        : m
+    );
+    setSelectedMeasurands(newMeasurands);
+  };
+
+  const handlePercentageDialogOpen = () => setPercentageDialogOpen(true);
+  const handlePercentageDialogClose = () => {
+    setPercentageDialogOpen(false);
+    setPercentageInput("");
+  };
+
+  const handlePercentageSave = () => {
+    const percentage = parseFloat(percentageInput);
+    if (isNaN(percentage) || percentage < 0 || percentage > 100) {
+      setSnackbarMessage("Please enter a valid percentage (0-100)");
+      setSnackbarSeverity("error");
+      setSnackbarOpen(true);
+      return;
+    }
+    setThresholds({ percentage });
+    handlePercentageDialogClose();
+    setSnackbarMessage("Percentage threshold applied");
     setSnackbarSeverity("success");
     setSnackbarOpen(true);
   };
@@ -657,7 +749,22 @@ const DashboardGraphWidget = ({
                   color: isDarkMode ? "#d1d5db" : "#6b7280",
                 }}
               />{" "}
-              Compare
+              Compare Measurands
+            </MenuItem>
+            <MenuItem
+              onClick={() => {
+                handlePercentageDialogOpen();
+                handleMenuClose();
+              }}
+            >
+              <CompareIcon
+                sx={{
+                  fontSize: "0.75rem",
+                  mr: 1,
+                  color: isDarkMode ? "#d1d5db" : "#6b7280",
+                }}
+              />{" "}
+              Set Percentage Threshold
             </MenuItem>
             <MenuItem
               onClick={() => {
@@ -756,137 +863,91 @@ const DashboardGraphWidget = ({
           Comparison Options
         </Typography>
         <Box sx={{ px: 2 }}>
-          <FormControl fullWidth sx={{ mb: 2 }}>
-            <InputLabel
-              sx={{
-                color: isDarkMode ? "#d1d5db" : "#4b5563",
-                fontFamily: "Inter",
-              }}
+          <Typography
+            variant="body2"
+            sx={{
+              color: isDarkMode ? "#d1d5db" : "#4b5563",
+              fontFamily: "Inter",
+              mb: 2,
+            }}
+          >
+            Select Measurands to Compare (Max 3)
+          </Typography>
+          {availableMeasurands.map((measurand) => (
+            <Box
+              key={measurand.MeasurandId}
+              sx={{ display: "flex", alignItems: "center", mb: 1 }}
             >
-              Measurand
-            </InputLabel>
-            <Select
-              value={measurand}
-              onChange={handleMeasurandChange}
-              label="Measurand"
-              sx={{
-                color: isDarkMode ? "#d1d5db" : "#4b5563",
-                fontFamily: "Inter",
-                "& .MuiOutlinedInput-notchedOutline": {
-                  borderColor: isDarkMode ? "#4b5563" : "#e5e7eb",
-                },
-                "&:hover .MuiOutlinedInput-notchedOutline": {
-                  borderColor: isDarkMode ? "#6b7280" : "#d1d5db",
-                },
-              }}
-            >
-              <MenuItem value="">
-                <em>Select Measurand</em>
-              </MenuItem>
-              {availableMeasurands.map((m) => (
-                <MenuItem
-                  key={m.MeasurandId}
-                  value={m.MeasurandName}
-                  sx={{ fontFamily: "Inter" }}
-                >
-                  {m.MeasurandName}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <FormControl fullWidth sx={{ mb: 2 }}>
-            <InputLabel
-              sx={{
-                color: isDarkMode ? "#d1d5db" : "#4b5563",
-                fontFamily: "Inter",
-              }}
-            >
-              Color
-            </InputLabel>
-            <Select
-              value={color}
-              onChange={handleColorChange}
-              label="Color"
-              sx={{
-                color: isDarkMode ? "#d1d5db" : "#4b5563",
-                fontFamily: "Inter",
-                "& .MuiOutlinedInput-notchedOutline": {
-                  borderColor: isDarkMode ? "#4b5563" : "#e5e7eb",
-                },
-                "&:hover .MuiOutlinedInput-notchedOutline": {
-                  borderColor: isDarkMode ? "#6b7280" : "#d1d5db",
-                },
-              }}
-            >
-              {colorOptions.map((c) => (
-                <MenuItem
-                  key={c.name}
-                  value={c.name}
-                  sx={{ fontFamily: "Inter" }}
-                >
-                  <Box sx={{ display: "flex", alignItems: "center" }}>
-                    <Box
-                      sx={{
-                        width: 16,
-                        height: 16,
-                        bgcolor: c.value,
-                        borderRadius: "4px",
-                        mr: 1,
-                      }}
-                    />
-                    {c.name}
-                  </Box>
-                </MenuItem>
-              ))}
-              <MenuItem value="Custom" sx={{ fontFamily: "Inter" }}>
-                <Box sx={{ display: "flex", alignItems: "center" }}>
-                  <Box
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={selectedMeasurands.some(
+                      (m) => m.id === measurand.MeasurandId
+                    )}
+                    onChange={() => handleCheckboxChange(measurand)}
                     sx={{
-                      width: 16,
-                      height: 16,
-                      bgcolor: customColor,
-                      borderRadius: "4px",
-                      mr: 1,
+                      color: isDarkMode ? "#d1d5db" : "#4b5563",
                     }}
                   />
-                  Custom
-                </Box>
-              </MenuItem>
-            </Select>
-          </FormControl>
-          <Box sx={{ mb: 2 }}>
-            <Typography
-              variant="body2"
-              sx={{
-                color: isDarkMode ? "#d1d5db" : "#4b5563",
-                fontFamily: "Inter",
-                mb: 1,
-              }}
-            >
-              Custom Color
-            </Typography>
-            <input
-              type="color"
-              value={customColor}
-              onChange={handleCustomColorChange}
-              style={{
-                width: "100%",
-                height: "40px",
-                border: `1px solid ${isDarkMode ? "#4b5563" : "#e5e7eb"}`,
-                borderRadius: "4px",
-                cursor: "pointer",
-              }}
-            />
-          </Box>
+                }
+                label={measurand.MeasurandName}
+                sx={{
+                  color: isDarkMode ? "#d1d5db" : "#4b5563",
+                  fontFamily: "Inter",
+                  flexGrow: 1,
+                }}
+              />
+              <TextField
+                type="color"
+                value={measurandColors[measurand.MeasurandId] || "#000000"}
+                onChange={(e) =>
+                  handleColorChange(measurand.MeasurandId, e.target.value)
+                }
+                disabled={
+                  !selectedMeasurands.some(
+                    (m) => m.id === measurand.MeasurandId
+                  )
+                }
+                sx={{
+                  width: 40,
+                  "& .MuiOutlinedInput-root": { padding: 0 },
+                  "& .MuiInputBase-input": { padding: 0 },
+                }}
+              />
+            </Box>
+          ))}
           <ApplyButton
-            onClick={handleApplySelection}
+            onClick={handleSidebarClose}
             isDarkMode={isDarkMode}
             fullWidth
+            sx={{ mt: 2 }}
           >
-            Apply
+            Close
           </ApplyButton>
         </Box>
       </Sidebar>
+
+      <Dialog open={percentageDialogOpen} onClose={handlePercentageDialogClose}>
+        <DialogTitle>Set Percentage Threshold</DialogTitle>
+        <DialogContent>
+          <TextField
+            fullWidth
+            label="Percentage (%)"
+            type="number"
+            value={percentageInput}
+            onChange={(e) => setPercentageInput(e.target.value)}
+            variant="outlined"
+            sx={{ mt: 2 }}
+            helperText="Enter a percentage to calculate min/max lines based on the primary measurand's average"
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handlePercentageDialogClose}>Cancel</Button>
+          <Button onClick={handlePercentageSave} variant="contained">
+            Apply
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <DeleteConfirmationDialog
         open={deleteDialogOpen}

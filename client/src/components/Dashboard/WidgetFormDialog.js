@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -10,69 +10,47 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Typography,
   Box,
-  Checkbox,
-  FormControlLabel,
-  Paper,
+  Typography,
+  IconButton,
 } from "@mui/material";
+import { Add as AddIcon, Delete as DeleteIcon } from "@mui/icons-material";
 import { styled } from "@mui/material/styles";
-import { ThemeContext } from "../../contexts/ThemeContext";
 
 const StyledDialog = styled(Dialog)(({ theme }) => ({
   "& .MuiDialog-paper": {
-    borderRadius: 16,
-    background:
-      theme.palette.mode === "dark"
-        ? "linear-gradient(135deg, #1e1e1e 0%, #2c2c2c 100%)"
-        : "linear-gradient(135deg, #ffffff 0%, #f5f7fa 100%)",
-    boxShadow:
-      theme.palette.mode === "dark"
-        ? "0 8px 32px rgba(0, 0, 0, 0.5)"
-        : "0 8px 32px rgba(0, 0, 0, 0.1)",
-    border: `1px solid ${theme.palette.divider}`,
-    padding: theme.spacing(1),
+    borderRadius: "12px",
+    padding: theme.spacing(2),
+    minWidth: "500px",
+    maxWidth: "700px",
   },
 }));
 
 const StyledButton = styled(Button)(({ theme }) => ({
-  "&:disabled": {
-    backgroundColor: theme.palette.grey[400],
-    color: theme.palette.grey[600],
-  },
-}));
-
-const RangeCard = styled(Paper)(({ theme }) => ({
-  padding: theme.spacing(2),
-  borderRadius: 8,
-  backgroundColor: theme.palette.mode === "dark" ? "#2c2c2c" : "#f9fafb",
-  boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)",
-  display: "flex",
-  alignItems: "center",
-  gap: theme.spacing(2),
-  marginBottom: theme.spacing(1),
+  borderRadius: "8px",
+  textTransform: "none",
+  fontWeight: 600,
+  fontFamily: "Inter",
+  padding: theme.spacing(1, 3),
 }));
 
 const customDefaultWidgetSettings = {
-  backgroundColor: "#000000",
-  borderColor: "#ffffff",
-  borderRadius: "3px",
-  borderWidth: "1px",
-  titleColor: "#ffffff",
-  titleFontFamily: "Arial",
-  titleFontSize: "24px",
+  backgroundColor: "#ffffff",
+  backgroundColorDark: "#1f2937",
+  headerBackgroundColor: "rgba(243, 244, 246, 0.5)",
+  headerBackgroundColorDark: "rgba(55, 65, 81, 0.5)",
+  headerBorder: "1px solid rgba(0, 0, 0, 0.1)",
+  headerBorderDark: "1px solid rgba(255, 255, 255, 0.1)",
+  borderRadius: "8px",
+  border: "none",
+  titleColor: "#000000",
+  titleFontFamily: "inherit",
+  titleFontSize: "14px",
   titleFontStyle: "normal",
   titleFontWeight: "normal",
   titleTextDecoration: "none",
-  valueColor: "#f8e71c",
-  valueFontFamily: "Arial",
-  valueFontSize: "24px",
-  valueFontStyle: "normal",
-  valueFontWeight: "bold",
-  valueTextDecoration: "none",
 };
 
-// --------------------------- Function renders a dialog form for creating/editing widgets -------------------------------
 const WidgetFormDialog = ({
   open,
   onClose,
@@ -84,34 +62,14 @@ const WidgetFormDialog = ({
   handleFormChange,
   handleSaveWidget,
 }) => {
-  const { isDarkMode } = useContext(ThemeContext);
   const [errors, setErrors] = useState({});
-  const [isFormValid, setIsFormValid] = useState(false);
 
-  // --------------------------- Function generates default ranges for gauge widget -------------------------------
-  const generateRanges = (min, max) => {
-    const rangeSize = (max - min) / 3;
-    return [
-      { start: min, end: min + rangeSize, color: "#ff5252" },
-      { start: min + rangeSize, end: min + 2 * rangeSize, color: "#ffeb3b" },
-      { start: min + 2 * rangeSize, end: max, color: "#4caf50" },
-    ];
-  };
-
-  // --------------------------- Function validates form data based on widget type -------------------------------
   const validateForm = useCallback(() => {
     const newErrors = {};
     let isValid = true;
 
     switch (widgetType) {
-      case "text":
-        if (!formData.textContent) {
-          newErrors.textContent = "Text content is required";
-          isValid = false;
-        }
-        break;
-      case "number":
-      case "gauge":
+      case "value":
         if (!formData.plant) newErrors.plant = "Plant is required";
         if (!formData.terminal) newErrors.terminal = "Terminal is required";
         if (!formData.measurement)
@@ -119,39 +77,10 @@ const WidgetFormDialog = ({
         if (!formData.name) newErrors.name = "Widget name is required";
         if (formData.decimals && isNaN(formData.decimals))
           newErrors.decimals = "Must be a valid number";
-        if (widgetType === "gauge") {
-          const minRange = Number(formData.minRange);
-          const maxRange = Number(formData.maxRange);
-          if (isNaN(minRange)) newErrors.minRange = "Must be a valid number";
-          if (isNaN(maxRange)) newErrors.maxRange = "Must be a valid number";
-          if (minRange >= maxRange)
-            newErrors.maxRange = "Max must be greater than Min";
-          if (!formData.ranges || formData.ranges.length !== 3)
-            newErrors.ranges = "Three ranges are required";
-          else {
-            const ranges = formData.ranges.map((r) => ({
-              start: Number(r.start),
-              end: Number(r.end),
-            }));
-            if (ranges.some((r) => isNaN(r.start) || isNaN(r.end)))
-              newErrors.ranges = "All range values must be valid numbers";
-            else if (ranges[0].start !== minRange || ranges[2].end !== maxRange)
-              newErrors.ranges = "Ranges must cover from min to max";
-            else {
-              for (let i = 0; i < ranges.length - 1; i++) {
-                if (ranges[i].end !== ranges[i + 1].start) {
-                  newErrors.ranges = "Ranges must be continuous";
-                  break;
-                }
-                if (ranges[i].start >= ranges[i].end) {
-                  newErrors.ranges =
-                    "Start must be less than End in each range";
-                  break;
-                }
-              }
-            }
-          }
-        }
+        if (formData.minRange && isNaN(formData.minRange))
+          newErrors.minRange = "Must be a valid number";
+        if (formData.maxRange && isNaN(formData.maxRange))
+          newErrors.maxRange = "Must be a valid number";
         isValid = Object.keys(newErrors).length === 0;
         break;
       case "graph":
@@ -160,21 +89,36 @@ const WidgetFormDialog = ({
         if (!formData.measurement)
           newErrors.measurement = "Measurement is required";
         if (!formData.name) newErrors.name = "Widget name is required";
-        if (!formData.graphType) newErrors.graphType = "Graph type is required";
         if (formData.decimals && isNaN(formData.decimals))
           newErrors.decimals = "Must be a valid number";
-        if (formData.resetInterval && isNaN(formData.resetInterval))
-          newErrors.resetInterval = "Must be a valid number";
+        if (
+          formData.thresholds?.percentage &&
+          isNaN(formData.thresholds.percentage)
+        )
+          newErrors.thresholds = "Percentage must be a valid number";
+        isValid = Object.keys(newErrors).length === 0;
+        break;
+      case "table":
+        if (!formData.plant) newErrors.plant = "Plant is required";
+        if (!formData.terminal) newErrors.terminal = "Terminal is required";
+        if (!formData.measurement)
+          newErrors.measurement = "Measurement is required";
+        if (!formData.name) newErrors.name = "Widget name is required";
+        if (formData.rows && isNaN(formData.rows))
+          newErrors.rows = "Must be a valid number";
+        if (formData.columns && isNaN(formData.columns))
+          newErrors.columns = "Must be a valid number";
+        isValid = Object.keys(newErrors).length === 0;
+        break;
+      case "text":
+        if (!formData.name) newErrors.name = "Widget name is required";
+        if (!formData.textContent)
+          newErrors.textContent = "Text content is required";
         isValid = Object.keys(newErrors).length === 0;
         break;
       case "image":
-        isValid = true;
-        break;
-      case "datagrid":
-        if (!formData.rows || isNaN(formData.rows))
-          newErrors.rows = "Valid number of rows is required";
-        if (!formData.columns || isNaN(formData.columns))
-          newErrors.columns = "Valid number of columns is required";
+        if (!formData.name) newErrors.name = "Widget name is required";
+        if (!formData.imageData) newErrors.imageData = "Image data is required";
         isValid = Object.keys(newErrors).length === 0;
         break;
       default:
@@ -186,40 +130,66 @@ const WidgetFormDialog = ({
   }, [widgetType, formData]);
 
   useEffect(() => {
-    if (widgetType === "gauge" && formData.minRange && formData.maxRange) {
-      const min = Number(formData.minRange);
-      const max = Number(formData.maxRange);
-      if (min < max && !formData.ranges) {
-        handleFormChange("ranges", generateRanges(min, max));
-      }
+    if (open) {
+      setErrors({});
     }
-  }, [
-    formData.minRange,
-    formData.maxRange,
-    formData.ranges,
-    widgetType,
-    handleFormChange,
-  ]);
+  }, [open]);
 
-  useEffect(() => {
-    setIsFormValid(validateForm());
-  }, [formData, widgetType, validateForm]);
+  const handleSubmit = () => {
+    if (!validateForm()) return;
 
-  // --------------------------- Function updates range values for gauge widget -------------------------------
+    const plantInfo = plants.find((p) => p.PlantName === formData.plant);
+    const terminalInfo = terminals.find(
+      (t) => t.TerminalName === formData.terminal
+    );
+    const measurandInfo = measurands.find(
+      (m) => m.MeasurandName === formData.measurement
+    );
+
+    const widgetData = {
+      name: formData.name || `${widgetType} Widget`,
+      plant: formData.plant || "",
+      terminal: formData.terminal || "",
+      measurement: formData.measurement || "",
+      plantId: plantInfo?.PlantId || "",
+      terminalId: terminalInfo?.TerminalId || "",
+      measurandId: measurandInfo?.MeasurandId || "",
+      unit: formData.unit || "",
+      decimals: formData.decimals ? Number(formData.decimals) : undefined,
+      textContent: formData.textContent || "",
+      minRange: formData.minRange ? Number(formData.minRange) : undefined,
+      maxRange: formData.maxRange ? Number(formData.maxRange) : undefined,
+      ranges: formData.ranges || undefined,
+      rows: formData.rows ? Number(formData.rows) : undefined,
+      columns: formData.columns ? Number(formData.columns) : undefined,
+      selectedMeasurands: formData.measurement
+        ? [{ id: measurandInfo?.MeasurandId, name: formData.measurement }]
+        : [],
+      thresholds: formData.thresholds || { percentage: null },
+      imageData: formData.imageData || "",
+      settings: { ...customDefaultWidgetSettings },
+    };
+
+    handleSaveWidget(widgetData);
+  };
+
+  const handleAddRange = () => {
+    const newRange = { min: "", max: "", color: "#000000" };
+    handleFormChange("ranges", [...(formData.ranges || []), newRange]);
+  };
+
   const handleRangeChange = (index, field, value) => {
-    const updatedRanges = [...formData.ranges];
-    updatedRanges[index] = { ...updatedRanges[index], [field]: Number(value) };
+    const updatedRanges = [...(formData.ranges || [])];
+    updatedRanges[index] = { ...updatedRanges[index], [field]: value };
     handleFormChange("ranges", updatedRanges);
   };
 
-  // --------------------------- Function resets gauge ranges to default values -------------------------------
-  const handleResetRanges = () => {
-    const min = Number(formData.minRange) || 0;
-    const max = Number(formData.maxRange) || 100;
-    if (min < max) handleFormChange("ranges", generateRanges(min, max));
+  const handleRemoveRange = (index) => {
+    const updatedRanges = [...(formData.ranges || [])];
+    updatedRanges.splice(index, 1);
+    handleFormChange("ranges", updatedRanges);
   };
 
-  // --------------------------- Function renders the form fields based on widget type -------------------------------
   const renderWidgetForm = () => {
     const commonFields = (
       <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
@@ -333,19 +303,162 @@ const WidgetFormDialog = ({
     );
 
     switch (widgetType) {
+      case "value":
+        return (
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+            {commonFields}
+            <TextField
+              fullWidth
+              label="Min Range (optional)"
+              type="number"
+              value={formData.minRange || ""}
+              onChange={(e) => handleFormChange("minRange", e.target.value)}
+              variant="outlined"
+              InputLabelProps={{ shrink: true }}
+              error={!!errors.minRange}
+              helperText={errors.minRange}
+              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+            />
+            <TextField
+              fullWidth
+              label="Max Range (optional)"
+              type="number"
+              value={formData.maxRange || ""}
+              onChange={(e) => handleFormChange("maxRange", e.target.value)}
+              variant="outlined"
+              InputLabelProps={{ shrink: true }}
+              error={!!errors.maxRange}
+              helperText={errors.maxRange}
+              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+            />
+            <Box>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                Ranges (optional)
+              </Typography>
+              {(formData.ranges || []).map((range, index) => (
+                <Box
+                  key={index}
+                  sx={{
+                    display: "flex",
+                    gap: 2,
+                    mb: 2,
+                    alignItems: "center",
+                  }}
+                >
+                  <TextField
+                    label="Min"
+                    type="number"
+                    value={range.min}
+                    onChange={(e) =>
+                      handleRangeChange(index, "min", e.target.value)
+                    }
+                    variant="outlined"
+                    sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+                  />
+                  <TextField
+                    label="Max"
+                    type="number"
+                    value={range.max}
+                    onChange={(e) =>
+                      handleRangeChange(index, "max", e.target.value)
+                    }
+                    variant="outlined"
+                    sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+                  />
+                  <TextField
+                    label="Color"
+                    type="color"
+                    value={range.color}
+                    onChange={(e) =>
+                      handleRangeChange(index, "color", e.target.value)
+                    }
+                    variant="outlined"
+                    sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+                  />
+                  <IconButton
+                    onClick={() => handleRemoveRange(index)}
+                    sx={{ color: "#b91c1c" }}
+                  >
+                    <DeleteIcon />
+                  </IconButton>
+                </Box>
+              ))}
+              <Button
+                startIcon={<AddIcon />}
+                onClick={handleAddRange}
+                sx={{ mt: 1 }}
+              >
+                Add Range
+              </Button>
+            </Box>
+          </Box>
+        );
+      case "graph":
+        return (
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+            {commonFields}
+            <TextField
+              fullWidth
+              label="Percentage Threshold (optional)"
+              type="number"
+              value={formData.thresholds?.percentage || ""}
+              onChange={(e) =>
+                handleFormChange("thresholds", {
+                  percentage: e.target.value,
+                })
+              }
+              variant="outlined"
+              InputLabelProps={{ shrink: true }}
+              error={!!errors.thresholds}
+              helperText={errors.thresholds}
+              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+            />
+          </Box>
+        );
+      case "table":
+        return (
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+            {commonFields}
+            <TextField
+              fullWidth
+              label="Rows (optional)"
+              type="number"
+              value={formData.rows || ""}
+              onChange={(e) => handleFormChange("rows", e.target.value)}
+              variant="outlined"
+              InputLabelProps={{ shrink: true }}
+              error={!!errors.rows}
+              helperText={errors.rows}
+              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+            />
+            <TextField
+              fullWidth
+              label="Columns (optional)"
+              type="number"
+              value={formData.columns || ""}
+              onChange={(e) => handleFormChange("columns", e.target.value)}
+              variant="outlined"
+              InputLabelProps={{ shrink: true }}
+              error={!!errors.columns}
+              helperText={errors.columns}
+              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+            />
+          </Box>
+        );
       case "text":
         return (
           <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
             <TextField
               fullWidth
-              label="Widget Name (optional)"
+              label="Widget Name"
               value={formData.name || ""}
               onChange={(e) => handleFormChange("name", e.target.value)}
               variant="outlined"
               InputLabelProps={{ shrink: true }}
+              error={!!errors.name}
+              helperText={errors.name}
               sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 }, mt: 2 }}
             />
-            {/* --------------------------- Section for text content input ------------------------------- */}
             <TextField
               fullWidth
               label="Text Content"
@@ -361,251 +474,30 @@ const WidgetFormDialog = ({
             />
           </Box>
         );
-      case "number":
-        return commonFields;
-      case "graph":
-        return (
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-            {commonFields}
-            {/* --------------------------- Section for graph type selection ------------------------------- */}
-            <FormControl fullWidth error={!!errors.graphType}>
-              <InputLabel id="graph-type-label">Graph Type</InputLabel>
-              <Select
-                labelId="graph-type-label"
-                value={formData.graphType || ""}
-                onChange={(e) => handleFormChange("graphType", e.target.value)}
-                label="Graph Type"
-                sx={{ borderRadius: 2 }}
-              >
-                <MenuItem value="simple">Simple</MenuItem>
-                <MenuItem value="multi-axis">Multi-axis</MenuItem>
-              </Select>
-              {errors.graphType && (
-                <Typography variant="caption" color="error">
-                  {errors.graphType}
-                </Typography>
-              )}
-            </FormControl>
-            <TextField
-              fullWidth
-              label="X-axis Configuration"
-              value={formData.xAxis || ""}
-              onChange={(e) => handleFormChange("xAxis", e.target.value)}
-              variant="outlined"
-              InputLabelProps={{ shrink: true }}
-              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
-            />
-            <TextField
-              fullWidth
-              label="Reset Interval"
-              type="number"
-              value={formData.resetInterval || ""}
-              onChange={(e) =>
-                handleFormChange("resetInterval", e.target.value)
-              }
-              variant="outlined"
-              InputLabelProps={{ shrink: true }}
-              error={!!errors.resetInterval}
-              helperText={errors.resetInterval}
-              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
-            />
-          </Box>
-        );
-      case "gauge":
-        return (
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-            {commonFields}
-            <TextField
-              fullWidth
-              label="Minimum Range"
-              type="number"
-              value={formData.minRange || ""}
-              onChange={(e) => handleFormChange("minRange", e.target.value)}
-              variant="outlined"
-              InputLabelProps={{ shrink: true }}
-              error={!!errors.minRange}
-              helperText={errors.minRange || "Default: 0"}
-              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
-            />
-            <TextField
-              fullWidth
-              label="Maximum Range"
-              type="number"
-              value={formData.maxRange || ""}
-              onChange={(e) => handleFormChange("maxRange", e.target.value)}
-              variant="outlined"
-              InputLabelProps={{ shrink: true }}
-              error={!!errors.maxRange}
-              helperText={errors.maxRange || "Default: 100"}
-              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
-            />
-            {formData.ranges && (
-              <Box sx={{ mt: 2 }}>
-                <Box
-                  sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    mb: 1,
-                  }}
-                >
-                  <Typography variant="subtitle1">Range Settings</Typography>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    onClick={handleResetRanges}
-                    disabled={!formData.minRange || !formData.maxRange}
-                    sx={{ textTransform: "none" }}
-                  >
-                    Reset Ranges
-                  </Button>
-                </Box>
-                {formData.ranges.map((range, index) => (
-                  <RangeCard key={index} elevation={2}>
-                    <TextField
-                      label={`Start`}
-                      type="number"
-                      value={range.start}
-                      onChange={(e) =>
-                        handleRangeChange(index, "start", e.target.value)
-                      }
-                      variant="outlined"
-                      size="small"
-                      sx={{ width: "30%" }}
-                      error={!!errors.ranges}
-                    />
-                    <TextField
-                      label={`End`}
-                      type="number"
-                      value={range.end}
-                      onChange={(e) =>
-                        handleRangeChange(index, "end", e.target.value)
-                      }
-                      variant="outlined"
-                      size="small"
-                      sx={{ width: "30%" }}
-                      error={!!errors.ranges}
-                    />
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                      <input
-                        type="color"
-                        value={range.color}
-                        onChange={(e) =>
-                          handleFormChange("ranges", [
-                            ...formData.ranges.slice(0, index),
-                            { ...range, color: e.target.value },
-                            ...formData.ranges.slice(index + 1),
-                          ])
-                        }
-                        style={{
-                          width: 40,
-                          height: 40,
-                          border: "none",
-                          borderRadius: "4px",
-                          cursor: "pointer",
-                        }}
-                      />
-                      <Typography variant="body2">{range.color}</Typography>
-                    </Box>
-                  </RangeCard>
-                ))}
-                {errors.ranges && (
-                  <Typography variant="caption" color="error">
-                    {errors.ranges}
-                  </Typography>
-                )}
-              </Box>
-            )}
-          </Box>
-        );
       case "image":
         return (
           <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-            {/* --------------------------- Section for image file upload ------------------------------- */}
-            <Box sx={{ mt: 2 }}>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => {
-                  handleFormChange("file", e.target.files[0]);
-                  if (e.target.files[0] && errors.file) {
-                    setErrors((prevErrors) => {
-                      const { file, ...rest } = prevErrors;
-                      return rest;
-                    });
-                  }
-                }}
-                style={{
-                  margin: "16px 0",
-                  padding: "10px",
-                  border: `2px dashed ${isDarkMode ? "#90caf9" : "#1976d2"}`,
-                  borderRadius: "8px",
-                  backgroundColor: isDarkMode ? "#2c2c2c" : "#f0f4f8",
-                  cursor: "pointer",
-                  color: isDarkMode ? "#e0e0e0" : "#37474f",
-                  display: "block",
-                  width: "100%",
-                }}
-              />
-              {errors.file && (
-                <Typography variant="caption" color="error">
-                  {errors.file}
-                </Typography>
-              )}
-            </Box>
-          </Box>
-        );
-      case "datagrid":
-        return (
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-            {/* --------------------------- Section for datagrid widget name input ------------------------------- */}
             <TextField
               fullWidth
-              label="Widget Name (optional)"
+              label="Widget Name"
               value={formData.name || ""}
               onChange={(e) => handleFormChange("name", e.target.value)}
               variant="outlined"
               InputLabelProps={{ shrink: true }}
+              error={!!errors.name}
+              helperText={errors.name}
               sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 }, mt: 2 }}
             />
-            {/* --------------------------- Section for number of rows input ------------------------------- */}
             <TextField
               fullWidth
-              label="Number of Rows"
-              type="number"
-              value={formData.rows || ""}
-              onChange={(e) => handleFormChange("rows", e.target.value)}
+              label="Image URL"
+              value={formData.imageData || ""}
+              onChange={(e) => handleFormChange("imageData", e.target.value)}
               variant="outlined"
               InputLabelProps={{ shrink: true }}
-              error={!!errors.rows}
-              helperText={errors.rows}
+              error={!!errors.imageData}
+              helperText={errors.imageData}
               sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
-            />
-            {/* --------------------------- Section for number of columns input ------------------------------- */}
-            <TextField
-              fullWidth
-              label="Number of Columns"
-              type="number"
-              value={formData.columns || ""}
-              onChange={(e) => handleFormChange("columns", e.target.value)}
-              variant="outlined"
-              InputLabelProps={{ shrink: true }}
-              error={!!errors.columns}
-              helperText={errors.columns}
-              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
-            />
-            {/* --------------------------- Section for timestamp checkbox ------------------------------- */}
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={formData.addTimestamp || false}
-                  onChange={(e) =>
-                    handleFormChange("addTimestamp", e.target.checked)
-                  }
-                  color="primary"
-                />
-              }
-              label="Add Timestamp Column"
             />
           </Box>
         );
@@ -614,68 +506,24 @@ const WidgetFormDialog = ({
     }
   };
 
-  // --------------------------- Function handles saving widget data after validation -------------------------------
-  const handleSave = () => {
-    if (validateForm()) {
-      const selectedPlant = plants.find((p) => p.PlantName === formData.plant);
-      const selectedTerminal = terminals.find(
-        (t) => t.TerminalName === formData.terminal
-      );
-      const selectedMeasurand = measurands.find(
-        (m) => m.MeasurandName === formData.measurement
-      );
-
-      const widgetData = {
-        ...formData,
-        id: Date.now().toString(),
-        type: widgetType,
-        minRange: formData.minRange ? Number(formData.minRange) : 0,
-        maxRange: formData.maxRange ? Number(formData.maxRange) : 100,
-        ranges: formData.ranges || [],
-        settings: { ...customDefaultWidgetSettings },
-        layout: {
-          i: Date.now().toString(),
-          x: 0,
-          y: 0,
-          w: 4,
-          h: 4,
-        },
-        plantId: selectedPlant ? selectedPlant.PlantId : "", // Add plantId
-        terminalId: selectedTerminal ? selectedTerminal.TerminalId : "", // Add terminalId
-        measurandId: selectedMeasurand ? selectedMeasurand.MeasurandId : "", // Add measurandId
-      };
-      handleSaveWidget(widgetData);
-      setErrors({});
-      onClose();
-    }
-  };
   return (
-    <StyledDialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+    <StyledDialog open={open} onClose={onClose}>
       <DialogTitle>
-        <Typography
-          variant="h5"
-          sx={{ fontWeight: 600, color: isDarkMode ? "#90caf9" : "#1976d2" }}
-        >
-          Create {widgetType} Widget
-        </Typography>
+        {widgetType
+          ? `Add ${
+              widgetType.charAt(0).toUpperCase() + widgetType.slice(1)
+            } Widget`
+          : "Add Widget"}
       </DialogTitle>
-      <DialogContent sx={{ py: 3 }}>{renderWidgetForm()}</DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2 }}>
+      <DialogContent>{renderWidgetForm()}</DialogContent>
+      <DialogActions>
+        <StyledButton onClick={onClose}>Cancel</StyledButton>
         <StyledButton
-          onClick={onClose}
-          color="inherit"
-          variant="outlined"
-          sx={{ borderRadius: 1, textTransform: "none" }}
-        >
-          Cancel
-        </StyledButton>
-        <StyledButton
-          onClick={handleSave}
           variant="contained"
-          disabled={!isFormValid}
-          sx={{ borderRadius: 1, textTransform: "none" }}
+          onClick={handleSubmit}
+          disabled={Object.keys(errors).length > 0}
         >
-          Create
+          Save
         </StyledButton>
       </DialogActions>
     </StyledDialog>

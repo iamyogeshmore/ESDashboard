@@ -38,7 +38,12 @@ const CreateMeasurandTableDialog = ({ open, onClose, onCreate }) => {
       axios
         .get(`${API_BASE_URL}/plants`)
         .then((response) => {
-          setPlants(response.data);
+          // Transform API response to match expected format
+          const transformedPlants = response.data.map((plant) => ({
+            plantId: plant.PlantId,
+            plantName: plant.PlantName,
+          }));
+          setPlants(transformedPlants);
           setLoading(false);
         })
         .catch((error) => {
@@ -54,7 +59,12 @@ const CreateMeasurandTableDialog = ({ open, onClose, onCreate }) => {
       axios
         .get(`${API_BASE_URL}/measurands/plant/${newTable.plantId}`)
         .then((response) => {
-          setMeasurands(response.data);
+          // Assuming measurands API returns MeasurandId, MeasurandName
+          const transformedMeasurands = response.data.map((measurand) => ({
+            measurandId: measurand.MeasurandId,
+            measurandName: measurand.MeasurandName,
+          }));
+          setMeasurands(transformedMeasurands);
           setLoading(false);
         })
         .catch((error) => {
@@ -72,7 +82,12 @@ const CreateMeasurandTableDialog = ({ open, onClose, onCreate }) => {
           `${API_BASE_URL}/terminals/plant/${newTable.plantId}/measurand/${newTable.measurandId}`
         )
         .then((response) => {
-          setTerminals(response.data);
+          // Assuming terminals API returns TerminalId, TerminalName
+          const transformedTerminals = response.data.map((terminal) => ({
+            terminalId: terminal.TerminalId,
+            terminalName: terminal.TerminalName,
+          }));
+          setTerminals(transformedTerminals);
           setLoading(false);
         })
         .catch((error) => {
@@ -101,8 +116,37 @@ const CreateMeasurandTableDialog = ({ open, onClose, onCreate }) => {
       onCreate({ error: "Please complete all table fields" });
       return;
     }
-    onCreate(newTable);
-    handleClose();
+
+    const selectedPlant = plants.find((p) => p.plantId === newTable.plantId);
+    const selectedMeasurand = measurands.find(
+      (m) => m.measurandId === newTable.measurandId
+    );
+    const selectedTerminals = terminals.filter((t) =>
+      newTable.terminalIds.includes(t.terminalId)
+    );
+
+    const tableData = {
+      plantId: newTable.plantId,
+      measurandId: newTable.measurandId,
+      terminalIds: newTable.terminalIds,
+      plantName: selectedPlant?.plantName || "",
+      measurandName: selectedMeasurand?.measurandName || "",
+      terminalNames: selectedTerminals.map((t) => t.terminalName),
+    };
+
+    axios
+      .post(`${API_BASE_URL}-hdd/create`, tableData)
+      .then((response) => {
+        if (response.data.success) {
+          onCreate(response.data.data);
+          handleClose();
+        } else {
+          onCreate({ error: response.data.message });
+        }
+      })
+      .catch((error) => {
+        onCreate({ error: "Failed to create table" });
+      });
   };
 
   const handleClose = () => {
@@ -133,8 +177,8 @@ const CreateMeasurandTableDialog = ({ open, onClose, onCreate }) => {
                 onChange={handleNewTableChange("plantId")}
               >
                 {plants.map((plant) => (
-                  <MenuItem key={plant.PlantId} value={plant.PlantId}>
-                    {plant.PlantName}
+                  <MenuItem key={plant.plantId} value={plant.plantId}>
+                    {plant.plantName}
                   </MenuItem>
                 ))}
               </Select>
@@ -152,10 +196,10 @@ const CreateMeasurandTableDialog = ({ open, onClose, onCreate }) => {
               >
                 {measurands.map((measurand) => (
                   <MenuItem
-                    key={measurand.MeasurandId}
-                    value={measurand.MeasurandId}
+                    key={measurand.measurandId}
+                    value={measurand.measurandId}
                   >
-                    {measurand.MeasurandName}
+                    {measurand.measurandName}
                   </MenuItem>
                 ))}
               </Select>
@@ -180,8 +224,8 @@ const CreateMeasurandTableDialog = ({ open, onClose, onCreate }) => {
                       <Chip
                         key={value}
                         label={
-                          terminals.find((t) => t.TerminalId === value)
-                            ?.TerminalName
+                          terminals.find((t) => t.terminalId === value)
+                            ?.terminalName
                         }
                       />
                     ))}
@@ -190,15 +234,15 @@ const CreateMeasurandTableDialog = ({ open, onClose, onCreate }) => {
               >
                 {terminals.map((terminal) => (
                   <MenuItem
-                    key={terminal.TerminalId}
-                    value={terminal.TerminalId}
+                    key={terminal.terminalId}
+                    value={terminal.terminalId}
                   >
                     <Checkbox
                       checked={newTable.terminalIds.includes(
-                        terminal.TerminalId
+                        terminal.terminalId
                       )}
                     />
-                    <ListItemText primary={terminal.TerminalName} />
+                    <ListItemText primary={terminal.terminalName} />
                   </MenuItem>
                 ))}
               </Select>
