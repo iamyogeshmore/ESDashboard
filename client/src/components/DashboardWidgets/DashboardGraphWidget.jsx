@@ -21,9 +21,6 @@ import {
   IconButton,
   useTheme,
   Drawer,
-  FormControl,
-  InputLabel,
-  Select,
   MenuItem,
   Button,
   Menu,
@@ -110,9 +107,7 @@ const WidgetHeader = styled(Box)(({ isDarkMode, settings }) => ({
   alignItems: "center",
   justifyContent: "space-between",
   padding: "6px 12px",
-  backgroundColor: isDarkMode
-    ? settings.headerBackgroundColorDark || "rgba(55, 65, 81, 0.5)"
-    : settings.headerBackgroundColor || "rgba(243, 244, 246, 0.5)",
+
   backdropFilter: "blur(4px)",
   opacity: 1,
   transition: "opacity 0.3s ease",
